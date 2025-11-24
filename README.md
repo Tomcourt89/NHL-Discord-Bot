@@ -1,164 +1,280 @@
-# NHL Countdown Discord Bot
+# NHL Discord Bot
 
-A Discord bot that provides NHL game countdowns for any team. Users can request countdowns by typing commands like `!pencountdown` for Pittsburgh Penguins games.
+A Discord bot that provides NHL game information, statistics, and video recaps.
 
 ## Features
 
-- 🏒 Get countdowns for any NHL team's next game
-- ⏰ Real-time countdown timers (days, hours, minutes)
-- 📅 Game date, time, and venue information
-- 🏟️ Home/away game indicators
-- 🎯 Easy-to-use team commands (e.g., `!pencountdown`, `!capscountdown`)
-- 📱 Rich Discord embeds with formatted information
+### Game Information
+- Game countdowns with date, time, and venue details
+- Previous game results and scores  
+- Video highlights with automatic embedding
+- Three stars information
 
-## Supported Commands
+### Statistics  
+- Team statistics for current season
+- Player statistics (current season and career)
+- Specialized goalie statistics
+- Multiple player search results
 
-The bot responds to commands in the format `![team]countdown`. Here are some examples:
+### League Information
+- Division standings
+- Full league standings with optional team highlighting
+- Conference standings (planned)
 
-### Popular Teams
-- `!pencountdown` - Pittsburgh Penguins
-- `!capscountdown` - Washington Capitals
-- `!rangerscountdown` - New York Rangers
-- `!bruinscountdown` - Boston Bruins
-- `!leafscountdown` - Toronto Maple Leafs
-- `!lightningcountdown` - Tampa Bay Lightning
+### Technical Features
+- Flexible team name recognition (abbreviations, nicknames, full names)
+- Real-time data from NHL APIs
+- YouTube integration for game highlights
+- Discord embed formatting
 
-### All Supported Team Names
-You can use team abbreviations, nicknames, or full names:
-- **Pittsburgh**: `pen`, `pens`, `penguins`, `pittsburgh`
-- **Washington**: `caps`, `capitals`, `washington`
-- **New York Rangers**: `rangers`
-- **Boston**: `bruins`
-- **Toronto**: `leafs`
-- **Tampa Bay**: `lightning`
-- And many more! (See the full list in the code)
+## Commands
 
-## Setup Instructions
+### Basic Commands
+```
+!commands                    # Show all available commands
+```
+
+### Game Information
+```
+!countdown [team]            # Countdown to next game
+!previousgame [team]         # Last game result and score
+!recap [team]               # Video highlights of last game
+```
+
+### Statistics  
+```
+!stats [team]               # Current season team statistics
+!playerstats [player]       # Current season player stats
+!careerstats [player]       # Complete career statistics
+```
+
+### Standings
+```
+!divisionstandings [team]   # Division standings for team's division
+!leaguestandings [team]     # Full league with optional team highlight  
+!conferencestandings [team] # Conference standings (coming soon)
+```
+
+### Usage Examples
+```
+!countdown pen              # Pittsburgh Penguins next game countdown
+!recap seattle             # Seattle Kraken last game highlights
+!playerstats crosby         # Sidney Crosby current season stats
+!careerstats ovechkin       # Alexander Ovechkin career totals
+!stats caps                # Washington Capitals team statistics
+!leaguestandings devils     # Full NHL standings highlighting New Jersey
+```
+
+## Setup
 
 ### Prerequisites
 - Node.js 16.0.0 or higher
-- A Discord bot token
-- A Discord server where you have permission to add bots
+- Discord bot token
+- Discord server with bot permissions
+- YouTube Data API key (optional, for enhanced video search)
 
-### 1. Create a Discord Bot
+### Environment Variables
 
-1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
-2. Click "New Application" and give it a name
-3. Go to the "Bot" section
-4. Click "Add Bot"
-5. Copy the bot token (you'll need this later)
-6. Under "Privileged Gateway Intents", enable:
-   - Message Content Intent
+Edit the `.env` file in the project root and replace the placeholder values:
+```
+DISCORD_TOKEN=your_actual_discord_bot_token_here
+YOUTUBE_API_KEY=your_actual_youtube_api_key_here
+```
 
-### 2. Invite Bot to Your Server
+**Important**: Never commit your `.env` file to version control. The `.gitignore` file is configured to exclude it.
 
-1. In the Developer Portal, go to the "OAuth2" > "URL Generator" section
-2. Select the following scopes:
-   - `bot`
-3. Select the following permissions:
-   - Send Messages
-   - Use Slash Commands
-   - Embed Links
-4. Copy the generated URL and open it in your browser
-5. Select the server you want to add the bot to
+### Discord Bot Setup
 
-### 3. Configure the Bot
+1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
+2. Create new application
+3. Go to Bot section, create bot, copy token
+4. Enable "Message Content Intent" under Privileged Gateway Intents
+5. Go to OAuth2 > URL Generator
+6. Select scopes: `bot`
+7. Select permissions: `Send Messages`, `Send Messages in Threads`, `Embed Links`, `Read Message History`
+8. Use generated URL to invite bot to your server
 
-1. Clone or download this repository
-2. Copy `.env.example` to `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-3. Edit `.env` and add your Discord bot token:
-   ```
-   DISCORD_TOKEN=your_discord_bot_token_here
-   ```
+### YouTube API Setup (Optional)
 
-### 4. Install Dependencies
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create project or select existing
+3. Enable YouTube Data API v3
+4. Create API key credential
+5. Add key to `.env` file
+
+Without YouTube API key, video search will provide search links instead of embedded videos.
+
+### Installation
 
 ```bash
 npm install
-```
-
-### 5. Run the Bot
-
-```bash
 npm start
 ```
 
-You should see a message like "✅ [BotName] is online!" in the console.
+### Hosting for 24/7 Availability
 
-## Usage Examples
+For production hosting, use environment variables instead of `.env` files:
 
-Once the bot is running in your Discord server, try these commands:
+**Platform-specific instructions:**
 
+**Heroku:**
+```bash
+heroku config:set DISCORD_TOKEN=your_token_here
+heroku config:set YOUTUBE_API_KEY=your_key_here
 ```
-!pencountdown
-```
-> Returns countdown to the next Pittsburgh Penguins game
 
+**Railway:**
+```bash
+railway variables set DISCORD_TOKEN=your_token_here
+railway variables set YOUTUBE_API_KEY=your_key_here
 ```
-!capscountdown  
-```
-> Returns countdown to the next Washington Capitals game
 
+**DigitalOcean App Platform:**
+Add environment variables in the App Platform dashboard under Settings > Environment Variables
+
+**VPS/Server:**
+```bash
+# Add to ~/.bashrc or /etc/environment
+export DISCORD_TOKEN=your_token_here
+export YOUTUBE_API_KEY=your_key_here
 ```
-!bruinscountdown
+
+**Docker:**
+```bash
+docker run -e DISCORD_TOKEN=your_token -e YOUTUBE_API_KEY=your_key your_image
 ```
-> Returns countdown to the next Boston Bruins game
+
+### Security Best Practices
+
+1. Never commit API keys to version control
+2. Use different API keys for development and production
+3. Regularly rotate API keys
+4. Use hosting platform's secret management when available
+5. Monitor API key usage for unauthorized access
 
 ## API Information
 
-This bot uses the official NHL API (`api-web.nhle.com`) to fetch:
-- Team schedules
-- Game times and venues
-- Opponent information
+This bot uses multiple data sources:
 
-No API key is required as the NHL API is publicly accessible.
+- **NHL API** (`api-web.nhle.com`): Game schedules, team stats, player information
+- **NHL Search API** (`search.d3.nhle.com`): Player search and statistics
+- **YouTube Data API v3** (optional): Video highlights and recaps
+
+No API keys are required for NHL data as their APIs are publicly accessible.
 
 ## Development
 
 ### Project Structure
 ```
-├── index.js          # Main bot file
+├── index.js          # Main bot file with all commands and logic
 ├── package.json      # Dependencies and scripts
-├── .env.example      # Environment variables template
-├── .gitignore        # Git ignore rules
-└── README.md         # This file
+├── .env              # Environment variables (git-ignored)
+├── .gitignore        # Git ignore rules  
+└── README.md         # Documentation
 ```
 
-### Adding New Teams
-To add support for new team names/abbreviations:
+### Key Functions
+- `getNextGame()` - Fetches upcoming game data
+- `getPreviousGame()` - Gets most recent completed game
+- `getGameRecap()` - Searches for video highlights with YouTube integration
+- `getTeamStats()` - Current season team statistics  
+- `getPlayerStats()` - Current season player data
+- `getPlayerCareerStats()` - Complete career statistics
+- `getStandings()` - League standings and rankings
+- `getCurrentNHLSeason()` - Smart season detection based on date
 
-1. Add entries to the `teamMappings` object in `index.js`
-2. Add the team's full name to the `teamNames` object
+### Adding New Features
 
-### Customization
-- Modify the embed colors and styling in the `embed` object
-- Add new command patterns by modifying the message parsing logic
-- Extend functionality by adding new API endpoints or data sources
+**New Commands:**
+1. Add command detection in main message handler
+2. Create corresponding function to fetch/process data
+3. Format response with Discord embeds
+4. Handle error cases
+
+**New Team Names:**
+1. Add entries to `teamMappings` object in `index.js`
+2. Ensure official abbreviation exists in `teamNames`
+
+### Testing
+```bash
+!commands                   # Help menu
+!countdown pit             # Upcoming game
+!previousgame sea          # Recent game  
+!recap van                 # Video highlights
+!stats tor                 # Team statistics
+!playerstats crosby        # Single player result
+!playerstats smith         # Multiple player results
+!careerstats ovechkin      # Career totals
+!divisionstandings det     # Division standings
+!leaguestandings bos       # Highlighted standings
+```
+
+## API Information
+
+- **NHL API** (`api-web.nhle.com`): Game schedules, team stats, player information
+- **NHL Search API** (`search.d3.nhle.com`): Player search and statistics
+- **YouTube Data API v3** (optional): Video highlights and recaps
+
+NHL APIs are publicly accessible and require no authentication.
+
+## License
+
+MIT License
 
 ## Troubleshooting
 
 ### Bot Not Responding
-1. Check that the bot is online (green status in Discord)
-2. Verify the bot has permission to read and send messages in the channel
-3. Ensure Message Content Intent is enabled in the Discord Developer Portal
+- Check bot online status in Discord
+- Verify bot has Send Messages permission in channel
+- Ensure Message Content Intent is enabled in Developer Portal
+- Check console for error messages
+- Verify `.env` file exists with correct `DISCORD_TOKEN`
 
-### API Errors
-1. Check your internet connection
-2. The NHL API may occasionally be unavailable
-3. Check the console for error messages
+### API/Data Issues  
+- NHL API may have occasional outages
+- Some players/teams might not have current season data
+- Game highlights may not be available immediately after games
+- Times are displayed in system timezone
 
-### Token Issues
-1. Make sure your `.env` file contains the correct bot token
-2. Regenerate the token in the Discord Developer Portal if needed
-3. Don't share your bot token publicly
+### Video/YouTube Issues
+- Without API key: Videos show as search links instead of embedded players
+- Highlights may not exist for older games  
+- Some videos can't be embedded due to creator settings
+- When exact videos aren't found, search results are provided
+
+### Performance Issues
+- NHL APIs can be slow during peak times (game nights)
+- Multiple rapid requests might be rate limited
+- Bot loads all team mappings on startup (normal behavior)
+
+### Common Error Messages
+```
+"Sorry, I don't recognize the team..."
+→ Check team name spelling or try different variation
+
+"No upcoming games found..."  
+→ Team might be in off-season or have scheduling gaps
+
+"No players found matching..."
+→ Try partial names or check spelling
+```
 
 ## Contributing
 
-Feel free to submit issues and pull requests to improve the bot!
+Areas for improvement:
+- Caching for API responses
+- Performance optimization for high-traffic servers  
+- Enhanced embed designs
+- Migration to Discord slash commands
+- Input validation and rate limiting
+
+### Development Workflow
+1. Fork repository
+2. Create feature branch
+3. Test thoroughly
+4. Update documentation  
+5. Submit pull request
 
 ## License
 
-MIT License - feel free to use and modify as needed.
+MIT License

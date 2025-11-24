@@ -1,5 +1,5 @@
 {
-  "name": "nhl-countdown-discord-bot",
+  "name": "nhl-discord-bot",
   "version": "1.0.0",
   "description": "A Discord bot that provides NHL game countdowns for any team",
   "main": "index.js",
