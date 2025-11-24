@@ -16,37 +16,117 @@ const teamMappings = {
     'pens': 'PIT',
     'penguins': 'PIT',
     'pittsburgh': 'PIT',
+    'pit': 'PIT',
     'caps': 'WSH',
     'capitals': 'WSH',
     'washington': 'WSH',
+    'wsh': 'WSH',
     'rangers': 'NYR',
+    'nyr': 'NYR',
+    'newyorkrangers': 'NYR',
     'devils': 'NJD',
+    'njd': 'NJD',
+    'newjersey': 'NJD',
+    'jersey': 'NJD',
     'flyers': 'PHI',
+    'phi': 'PHI',
+    'philadelphia': 'PHI',
+    'philly': 'PHI',
     'islanders': 'NYI',
+    'isles': 'NYI',
+    'nyi': 'NYI',
+    'newyorkislanders': 'NYI',
     'bruins': 'BOS',
+    'bos': 'BOS',
+    'boston': 'BOS',
     'sabres': 'BUF',
+    'sabers': 'BUF',
+    'buf': 'BUF',
+    'buffalo': 'BUF',
     'leafs': 'TOR',
+    'mapleleafs': 'TOR',
+    'tor': 'TOR',
+    'toronto': 'TOR',
+    'buds': 'TOR',
     'senators': 'OTT',
+    'sens': 'OTT',
+    'ott': 'OTT',
+    'ottawa': 'OTT',
     'canadiens': 'MTL',
+    'habs': 'MTL',
+    'mtl': 'MTL',
+    'montreal': 'MTL',
     'lightning': 'TBL',
+    'bolts': 'TBL',
+    'tbl': 'TBL',
+    'tampa': 'TBL',
+    'tampabay': 'TBL',
     'panthers': 'FLA',
+    'cats': 'FLA',
+    'fla': 'FLA',
+    'florida': 'FLA',
     'hurricanes': 'CAR',
+    'canes': 'CAR',
+    'car': 'CAR',
+    'carolina': 'CAR',
     'jackets': 'CBJ',
+    'bluejackets': 'CBJ',
+    'cbj': 'CBJ',
+    'columbus': 'CBJ',
     'wings': 'DET',
+    'redwings': 'DET',
+    'det': 'DET',
+    'detroit': 'DET',
     'predators': 'NSH',
+    'preds': 'NSH',
+    'nsh': 'NSH',
+    'nashville': 'NSH',
     'blues': 'STL',
+    'stl': 'STL',
+    'stlouis': 'STL',
+    'saintlouis': 'STL',
     'wild': 'MIN',
+    'min': 'MIN',
+    'minnesota': 'MIN',
     'blackhawks': 'CHI',
+    'hawks': 'CHI',
+    'chi': 'CHI',
+    'chicago': 'CHI',
     'avalanche': 'COL',
+    'avs': 'COL',
+    'col': 'COL',
+    'colorado': 'COL',
     'stars': 'DAL',
+    'dal': 'DAL',
+    'dallas': 'DAL',
     'kings': 'LAK',
+    'lak': 'LAK',
+    'losangeles': 'LAK',
+    'la': 'LAK',
     'ducks': 'ANA',
+    'ana': 'ANA',
+    'anaheim': 'ANA',
     'sharks': 'SJS',
+    'sjs': 'SJS',
+    'sanjose': 'SJS',
     'knights': 'VGK',
+    'goldenknights': 'VGK',
+    'vgk': 'VGK',
+    'vegas': 'VGK',
+    'lasvegas': 'VGK',
     'flames': 'CGY',
+    'cgy': 'CGY',
+    'calgary': 'CGY',
     'oilers': 'EDM',
+    'edm': 'EDM',
+    'edmonton': 'EDM',
     'canucks': 'VAN',
-    'kraken': 'SEA'
+    'nucks': 'VAN',
+    'van': 'VAN',
+    'vancouver': 'VAN',
+    'kraken': 'SEA',
+    'sea': 'SEA',
+    'seattle': 'SEA'
 };
 
 // Full team names mapping
@@ -105,6 +185,317 @@ async function getNextGame(teamAbbreviation) {
     }
 }
 
+async function getPreviousGame(teamAbbreviation) {
+    try {
+        const response = await axios.get(`https://api-web.nhle.com/v1/club-schedule/${teamAbbreviation}/month/now`);
+        const games = response.data.games;
+        
+        const now = new Date();
+        const pastGames = games.filter(game => new Date(game.startTimeUTC) < now && game.gameState === 'OFF');
+        
+        if (pastGames.length === 0) {
+            return null;
+        }
+        
+        return pastGames[pastGames.length - 1]; // Most recent game
+    } catch (error) {
+        console.error('Error fetching previous game data:', error);
+        return null;
+    }
+}
+
+async function getTeamStats(teamAbbreviation) {
+    try {
+        // Try the standings API to get current season stats
+        const response = await axios.get('https://api-web.nhle.com/v1/standings/now');
+        const teamStats = response.data.standings.find(team => team.teamAbbrev.default === teamAbbreviation);
+        
+        if (teamStats) {
+            return {
+                wins: teamStats.wins,
+                losses: teamStats.losses,
+                otLosses: teamStats.otLosses,
+                points: teamStats.points,
+                pointPctg: teamStats.pointPctg,
+                gamesPlayed: teamStats.gamesPlayed,
+                goalFor: teamStats.goalFor,
+                goalAgainst: teamStats.goalAgainst,
+                goalDifferential: teamStats.goalDifferential
+            };
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('Error fetching team stats:', error);
+        return null;
+    }
+}
+
+function getCurrentNHLSeason() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1; // getMonth() returns 0-11, so add 1
+    
+    // NHL season typically starts in October and ends in June
+    // So if it's January-June, we're in the season that started the previous year
+    // If it's July-December, we're in the season that starts this year
+    
+    let seasonStartYear;
+    if (month >= 7) { // July through December - current year season
+        seasonStartYear = year;
+    } else { // January through June - season started last year
+        seasonStartYear = year - 1;
+    }
+    
+    // NHL season format: 2024-25 season = 20242025
+    const seasonEndYear = seasonStartYear + 1;
+    return parseInt(`${seasonStartYear}${seasonEndYear}`);
+}
+
+async function getPlayerStats(playerQuery) {
+    try {
+        // Search for players matching the query
+        const searchResponse = await axios.get(`https://search.d3.nhle.com/api/v1/search/player?culture=en-us&limit=20&q=${encodeURIComponent(playerQuery)}`);
+        
+        if (!searchResponse.data || searchResponse.data.length === 0) {
+            return null;
+        }
+        
+        const players = searchResponse.data;
+        const playerStats = [];
+        const currentSeason = getCurrentNHLSeason();
+        
+        for (const player of players.slice(0, 5)) { // Limit to 5 players max
+            try {
+                const statsResponse = await axios.get(`https://api-web.nhle.com/v1/player/${player.playerId}/landing`);
+                if (statsResponse.data && statsResponse.data.seasonTotals && statsResponse.data.seasonTotals.length > 0) {
+                    // Find current season stats
+                    const currentSeasonStats = statsResponse.data.seasonTotals.find(season => season.season === currentSeason);
+                    
+                    if (currentSeasonStats) {
+                        playerStats.push({
+                            name: `${player.name}`,
+                            team: statsResponse.data.currentTeamAbbrev || 'N/A',
+                            position: statsResponse.data.position || 'N/A',
+                            stats: currentSeasonStats,
+                            playerId: player.playerId,
+                            season: currentSeason
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error(`Error fetching stats for player ${player.playerId}:`, error);
+                continue;
+            }
+        }
+        
+        return playerStats;
+    } catch (error) {
+        console.error('Error fetching player stats:', error);
+        return null;
+    }
+}
+
+async function getPlayerCareerStats(playerQuery) {
+    try {
+        // Search for players matching the query
+        const searchResponse = await axios.get(`https://search.d3.nhle.com/api/v1/search/player?culture=en-us&limit=20&q=${encodeURIComponent(playerQuery)}`);
+        
+        if (!searchResponse.data || searchResponse.data.length === 0) {
+            return null;
+        }
+        
+        const players = searchResponse.data;
+        const playerCareerStats = [];
+        
+        for (const player of players.slice(0, 5)) { // Limit to 5 players max
+            try {
+                const statsResponse = await axios.get(`https://api-web.nhle.com/v1/player/${player.playerId}/landing`);
+                if (statsResponse.data && statsResponse.data.careerTotals) {
+                    const careerStats = statsResponse.data.careerTotals.regularSeason;
+                    
+                    if (careerStats) {
+                        playerCareerStats.push({
+                            name: `${player.name}`,
+                            team: statsResponse.data.currentTeamAbbrev || 'N/A',
+                            position: statsResponse.data.position || 'N/A',
+                            stats: careerStats,
+                            playerId: player.playerId,
+                            birthDate: statsResponse.data.birthDate,
+                            birthCity: statsResponse.data.birthCity?.default,
+                            birthCountry: statsResponse.data.birthCountry
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error(`Error fetching career stats for player ${player.playerId}:`, error);
+                continue;
+            }
+        }
+        
+        return playerCareerStats;
+    } catch (error) {
+        console.error('Error fetching player career stats:', error);
+        return null;
+    }
+}
+
+async function getGameRecap(teamAbbreviation) {
+    try {
+        const response = await axios.get(`https://api-web.nhle.com/v1/club-schedule/${teamAbbreviation}/month/now`);
+        const games = response.data.games;
+        
+        const now = new Date();
+        const pastGames = games.filter(game => new Date(game.startTimeUTC) < now && game.gameState === 'OFF');
+        
+        if (pastGames.length === 0) {
+            return null;
+        }
+        
+        const lastGame = pastGames[pastGames.length - 1]; // Most recent game
+        
+        try {
+            const gameDetailsResponse = await axios.get(`https://api-web.nhle.com/v1/gamecenter/${lastGame.id}/landing`);
+            
+            let recapVideo = null;
+            
+            // Search for YouTube video of the game highlights using YouTube Data API
+            const awayTeamName = teamNames[lastGame.awayTeam.abbrev] || lastGame.awayTeam.abbrev;
+            const homeTeamName = teamNames[lastGame.homeTeam.abbrev] || lastGame.homeTeam.abbrev;
+            const gameDate = new Date(lastGame.startTimeUTC);
+            const dateString = gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            
+            // Try to find actual YouTube video
+            try {
+                // YouTube Data API search (you'll need to add YOUTUBE_API_KEY to .env)
+                const youtubeApiKey = process.env.YOUTUBE_API_KEY;
+                
+                if (youtubeApiKey) {
+                    const searchQueries = [
+                        `${awayTeamName} vs ${homeTeamName} highlights ${dateString}`,
+                        `${awayTeamName} ${homeTeamName} recap`,
+                        `NHL highlights ${awayTeamName} ${homeTeamName}`,
+                        `${awayTeamName} ${homeTeamName} goals`,
+                        `Devils Panthers highlights` // Fallback with shorter names
+                    ];
+                    
+                    for (const query of searchQueries) {
+                        try {
+                            let youtubeSearchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=UCqFii6I0kpYUaHV3t_dUOOg&q=${encodeURIComponent(query)}&type=video&order=date&maxResults=10&key=${youtubeApiKey}`;
+                            let response = await axios.get(youtubeSearchUrl);
+                            
+                            if (!response.data.items || response.data.items.length === 0) {
+                                youtubeSearchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query + ' NHL')}&type=video&order=relevance&maxResults=10&key=${youtubeApiKey}`;
+                                response = await axios.get(youtubeSearchUrl);
+                            }
+                            
+                            if (response.data.items && response.data.items.length > 0) {
+                                const video = response.data.items.find(item => {
+                                    const title = item.snippet.title.toLowerCase();
+                                    const channelName = item.snippet.channelTitle.toLowerCase();
+                                    
+                                    return (title.includes('highlights') || title.includes('recap')) &&
+                                           (title.includes(awayTeamName.toLowerCase()) || 
+                                            title.includes(homeTeamName.toLowerCase()) ||
+                                            title.includes('devils') || title.includes('panthers')) &&
+                                           (channelName.includes('nhl') || channelName.includes('sportsnet') || 
+                                            channelName.includes('tsn') || channelName.includes('espn'));
+                                }) || response.data.items[0];
+                                
+                                recapVideo = {
+                                    url: `https://www.youtube.com/watch?v=${video.id.videoId}`,
+                                    title: video.snippet.title,
+                                    thumbnail: video.snippet.thumbnails.medium?.url,
+                                    channelTitle: video.snippet.channelTitle,
+                                    isYouTube: true,
+                                    isEmbeddable: true
+                                };
+                                break;
+                            }
+                        } catch (error) {
+                            continue;
+                        }
+                    }
+                } else {
+                    recapVideo = {
+                        url: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${awayTeamName} vs ${homeTeamName} highlights ${longDateString} NHL`)}`,
+                        title: `${awayTeamName} vs ${homeTeamName} Highlights`,
+                        searchQuery: `${awayTeamName} vs ${homeTeamName} highlights ${longDateString} NHL`,
+                        isYouTube: true,
+                        isSearch: true
+                    };
+                }
+                
+            } catch (error) {
+                recapVideo = {
+                    url: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${awayTeamName} vs ${homeTeamName} highlights ${dateString} NHL`)}`,
+                    title: `${awayTeamName} vs ${homeTeamName} Highlights`,
+                    searchQuery: `${awayTeamName} vs ${homeTeamName} highlights ${dateString} NHL`,
+                    isYouTube: true,
+                    isSearch: true
+                };
+            }
+            
+            if (!recapVideo) {
+                try {
+                    const multimediaResponse = await axios.get(`https://api-web.nhle.com/v1/gamecenter/${lastGame.id}/play-by-play`);
+                    if (multimediaResponse.data && multimediaResponse.data.summary) {
+                        // Additional video content could be extracted here if needed
+                    }
+                } catch (mmError) {
+            
+                }
+            }
+            
+            // Method 4: Try NHL.tv style URLs (common patterns)
+            if (!recapVideo) {
+                // Try constructing common NHL video URLs
+                const gameId = lastGame.id;
+                const season = lastGame.season;
+                
+                // Common NHL video URL patterns to try
+                const possibleUrls = [
+                    `https://www.nhl.com/video/recap-${gameId}`,
+                    `https://hlslive-wsczoominwestus.med.nhl.com/publish/${gameId}_recap.mp4`,
+                    `https://nhl.bamcontent.com/images/videos/recap/${season}/${gameId}.mp4`
+                ];
+                
+                // For now, we'll assume no direct video URL construction works
+                // The NHL API structure may have changed
+            }
+            
+            return {
+                game: lastGame,
+                gameDetails: gameDetailsResponse.data,
+                recapVideo: recapVideo
+            };
+            
+        } catch (detailsError) {
+            console.error('Error fetching game details:', detailsError.message);
+            return {
+                game: lastGame,
+                gameDetails: null,
+                recapVideo: null
+            };
+        }
+        
+    } catch (error) {
+        console.error('Error fetching game recap:', error);
+        return null;
+    }
+}
+
+async function getStandings(type = 'league') {
+    try {
+        let url = 'https://api-web.nhle.com/v1/standings/now';
+        const response = await axios.get(url);
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching standings:', error);
+        return null;
+    }
+}
+
 function formatCountdown(targetDate) {
     const now = new Date();
     const target = new Date(targetDate);
@@ -126,94 +517,1012 @@ function formatCountdown(targetDate) {
     return countdown.trim();
 }
 
-client.on('ready', () => {
+client.on('clientReady', () => {
     console.log(`✅ ${client.user.tag} is online!`);
 });
 
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
     
-    // Check if message starts with ! and ends with "countdown"
     const content = message.content.toLowerCase();
-    if (!content.startsWith('!') || !content.endsWith('countdown')) return;
+    if (!content.startsWith('!')) return;
     
-    // Extract team name from command (e.g., "!pencountdown" -> "pen")
-    const teamInput = content.slice(1, -9); // Remove "!" and "countdown"
+    const args = content.slice(1).split(' ');
+    const command = args[0];
+    const teamInput = args[1];
     
-    if (!teamInput) {
-        message.reply('Please specify a team! Example: `!pencountdown` for Pittsburgh Penguins');
-        return;
-    }
-    
-    // Get team abbreviation
-    const teamAbbr = teamMappings[teamInput] || teamInput.toUpperCase();
-    const teamName = teamNames[teamAbbr];
-    
-    if (!teamName) {
-        message.reply(`Sorry, I don't recognize the team "${teamInput}". Try using team abbreviations like "pen" for Penguins or "caps" for Capitals.`);
-        return;
-    }
-    
-    try {
-        const game = await getNextGame(teamAbbr);
-        
-        if (!game) {
-            message.reply(`No upcoming games found for the ${teamName}.`);
-            return;
-        }
-        
-        const gameDate = new Date(game.startTimeUTC);
-        const countdown = formatCountdown(game.startTimeUTC);
-        const opponent = game.homeTeam.abbrev === teamAbbr ? game.awayTeam : game.homeTeam;
-        const venue = game.venue.default;
-        const isHome = game.homeTeam.abbrev === teamAbbr;
-        
-        const embed = {
+    if (command === 'commands') {
+        const commandsEmbed = {
             color: 0x0099ff,
-            title: `⏰ ${teamName} Countdown`,
-            description: `Next game: ${isHome ? 'vs' : '@'} ${teamNames[opponent.abbrev] || opponent.placeName.default}`,
+            title: '🏒 NHL Bot Commands',
+            description: 'Available commands for the NHL Discord Bot',
             fields: [
                 {
-                    name: '🕐 Time Until Game',
-                    value: countdown,
-                    inline: true
+                    name: '⏰ Countdown Commands',
+                    value: '`!countdown [team]` - Shows countdown to next game\nExample: `!countdown pen`, `!countdown seattle`',
+                    inline: false
                 },
                 {
-                    name: '📅 Game Date',
-                    value: gameDate.toLocaleDateString('en-US', {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                    }),
-                    inline: true
+                    name: '📊 Previous Game',
+                    value: '`!previousgame [team]` - Shows the most recent game result\nExample: `!previousgame pen`, `!previousgame seattle`',
+                    inline: false
                 },
                 {
-                    name: '🕒 Game Time',
-                    value: gameDate.toLocaleTimeString('en-US', {
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        timeZoneName: 'short'
-                    }),
-                    inline: true
+                    name: '🎬 Game Recap',
+                    value: '`!recap [team]` - Shows video recap of last game\nExample: `!recap pen`, `!recap seattle`',
+                    inline: false
                 },
                 {
-                    name: '🏒 Venue',
-                    value: venue,
+                    name: '📈 Team Stats',
+                    value: '`!stats [team]` - Shows current season statistics\nExample: `!stats pen`, `!stats seattle`',
+                    inline: false
+                },
+                {
+                    name: '👤 Player Stats',
+                    value: '`!playerstats [name]` - Shows player statistics\nExample: `!playerstats crosby`, `!playerstats hughes` (shows all Hughes players)',
+                    inline: false
+                },
+                {
+                    name: '📊 Career Stats',
+                    value: '`!careerstats [name]` - Shows player career totals\nExample: `!careerstats crosby`, `!careerstats ovechkin`',
+                    inline: false
+                },
+                {
+                    name: '🏆 Standings',
+                    value: '`!divisionstandings [team]` - Division standings\n`!conferencestandings [team]` - Conference standings\n`!leaguestandings [team]` - Full league standings (optional team highlight)',
+                    inline: false
+                },
+                {
+                    name: '🔤 Supported Teams',
+                    value: 'Use team names, cities, or abbreviations:\n`pen/pens/penguins/pittsburgh`, `seattle/kraken/sea`, `caps/capitals/washington`, etc.',
                     inline: false
                 }
             ],
-            timestamp: new Date().toISOString(),
             footer: {
-                text: 'NHL Countdown Bot'
+                text: 'All commands follow the format: !command team'
             }
         };
         
-        message.reply({ embeds: [embed] });
+        message.reply({ embeds: [commandsEmbed] });
+        return;
+    }
+    
+    if (command === 'countdown') {
+        if (!teamInput) {
+            message.reply('Please specify a team! Example: `!countdown pen` for Pittsburgh Penguins');
+            return;
+        }
         
-    } catch (error) {
-        console.error('Error processing countdown request:', error);
-        message.reply('Sorry, there was an error getting the countdown information. Please try again later.');
+        const teamAbbr = teamMappings[teamInput] || teamInput.toUpperCase();
+        const teamName = teamNames[teamAbbr];
+        
+        if (!teamName) {
+            message.reply(`Sorry, I don't recognize the team "${teamInput}". Use \`!commands\` to see supported teams.`);
+            return;
+        }
+        
+        try {
+            const game = await getNextGame(teamAbbr);
+            
+            if (!game) {
+                message.reply(`No upcoming games found for the ${teamName}.`);
+                return;
+            }
+            
+            const gameDate = new Date(game.startTimeUTC);
+            const countdown = formatCountdown(game.startTimeUTC);
+            const opponent = game.homeTeam.abbrev === teamAbbr ? game.awayTeam : game.homeTeam;
+            const isHome = game.homeTeam.abbrev === teamAbbr;
+            const hostCity = isHome ? teamName.split(' ').pop() : teamNames[opponent.abbrev].split(' ').pop();
+            
+            const embed = {
+                color: 0x0099ff,
+                title: `⏰ ${teamName} Countdown`,
+                description: `Next game: ${isHome ? 'vs' : '@'} ${teamNames[opponent.abbrev] || opponent.placeName.default}`,
+                fields: [
+                    {
+                        name: '🕐 Time Until Game',
+                        value: countdown,
+                        inline: true
+                    },
+                    {
+                        name: '📅 Game Date',
+                        value: gameDate.toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                        }),
+                        inline: true
+                    },
+                    {
+                        name: '🕒 Game Time',
+                        value: gameDate.toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            timeZoneName: 'short'
+                        }),
+                        inline: true
+                    },
+                    {
+                        name: '🏙️ Host City',
+                        value: hostCity,
+                        inline: false
+                    }
+                ],
+                timestamp: new Date().toISOString(),
+                footer: {
+                    text: 'NHL Countdown Bot'
+                }
+            };
+            
+            message.reply({ embeds: [embed] });
+            
+        } catch (error) {
+            console.error('Error processing countdown request:', error);
+            message.reply('Sorry, there was an error getting the countdown information. Please try again later.');
+        }
+        return;
+    }
+    
+    if (command === 'previousgame') {
+        if (!teamInput) {
+            message.reply('Please specify a team! Example: `!previousgame pen`');
+            return;
+        }
+        
+        const teamAbbr = teamMappings[teamInput] || teamInput.toUpperCase();
+        const teamName = teamNames[teamAbbr];
+        
+        if (!teamName) {
+            message.reply(`Sorry, I don't recognize the team "${teamInput}". Use \`!commands\` to see supported teams.`);
+            return;
+        }
+        
+        try {
+            const game = await getPreviousGame(teamAbbr);
+            
+            if (!game) {
+                message.reply(`No recent games found for the ${teamName}.`);
+                return;
+            }
+            
+            const gameDate = new Date(game.startTimeUTC);
+            const homeTeam = teamNames[game.homeTeam.abbrev];
+            const awayTeam = teamNames[game.awayTeam.abbrev];
+            const homeScore = game.homeTeam.score;
+            const awayScore = game.awayTeam.score;
+            const isHome = game.homeTeam.abbrev === teamAbbr;
+            const opponent = isHome ? awayTeam : homeTeam;
+            const teamScore = isHome ? homeScore : awayScore;
+            const opponentScore = isHome ? awayScore : homeScore;
+            const result = teamScore > opponentScore ? 'WIN' : 'LOSS';
+            const resultColor = result === 'WIN' ? 0x00ff00 : 0xff0000;
+            
+            const embed = {
+                color: resultColor,
+                title: `📊 ${teamName} Previous Game`,
+                description: `${result}: ${isHome ? 'vs' : '@'} ${opponent}`,
+                fields: [
+                    {
+                        name: '🏒 Final Score',
+                        value: `${teamName}: ${teamScore}\n${opponent}: ${opponentScore}`,
+                        inline: true
+                    },
+                    {
+                        name: '📅 Game Date',
+                        value: gameDate.toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            month: 'short',
+                            day: 'numeric'
+                        }),
+                        inline: true
+                    },
+                    {
+                        name: '🏆 Result',
+                        value: result,
+                        inline: true
+                    }
+                ],
+                timestamp: new Date().toISOString(),
+                footer: {
+                    text: 'NHL Bot'
+                }
+            };
+            
+            message.reply({ embeds: [embed] });
+            
+        } catch (error) {
+            console.error('Error processing previous game request:', error);
+            message.reply('Sorry, there was an error getting the previous game information. Please try again later.');
+        }
+        return;
+    }
+    
+    if (command === 'recap') {
+        if (!teamInput) {
+            message.reply('Please specify a team! Example: `!recap pen`');
+            return;
+        }
+        
+        const teamAbbr = teamMappings[teamInput] || teamInput.toUpperCase();
+        const teamName = teamNames[teamAbbr];
+        
+        if (!teamName) {
+            message.reply(`Sorry, I don't recognize the team "${teamInput}". Use \`!commands\` to see supported teams.`);
+            return;
+        }
+        
+        try {
+            const recapData = await getGameRecap(teamAbbr);
+            
+            if (!recapData) {
+                message.reply(`No recent games found for the ${teamName}.`);
+                return;
+            }
+            
+            const { game, gameDetails, recapVideo } = recapData;
+            const gameDate = new Date(game.startTimeUTC);
+            const homeTeam = teamNames[game.homeTeam.abbrev];
+            const awayTeam = teamNames[game.awayTeam.abbrev];
+            const isHome = game.homeTeam.abbrev === teamAbbr;
+            const opponent = isHome ? awayTeam : homeTeam;
+            const homeScore = game.homeTeam.score;
+            const awayScore = game.awayTeam.score;
+            
+            if (!recapVideo || !recapVideo.url) {
+                const gameId = game.id;
+                const nhlGameUrl = `https://www.nhl.com/gamecenter/${gameId}`;
+                
+                const embed = {
+                    color: 0x9b4dff,
+                    title: `🎬 ${teamName} vs ${opponent} - No Video Available`,
+                    description: `Game from ${gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} (${homeScore}-${awayScore})`,
+                    fields: [
+                        {
+                            name: '🌐 Watch on NHL.com',
+                            value: `[View game highlights and recap on NHL.com](${nhlGameUrl})`,
+                            inline: false
+                        },
+                        {
+                            name: '📊 Alternative',
+                            value: `Use \`!previousgame ${teamInput}\` for game details and stats`,
+                            inline: false
+                        }
+                    ],
+                    timestamp: new Date().toISOString(),
+                    footer: {
+                        text: 'NHL Bot - Video not available via API'
+                    }
+                };
+                
+                message.reply({ embeds: [embed] });
+                return;
+            }
+            
+            const embed = {
+                color: 0x9b4dff,
+                title: `🎬 ${teamName} vs ${opponent} - Video Recap`,
+                description: `Game played on ${gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+                fields: [],
+                timestamp: new Date().toISOString(),
+                footer: {
+                    text: 'NHL Bot - Video Recap'
+                }
+            };
+
+
+            if (recapVideo && recapVideo.url) {
+                if (recapVideo.isEmbeddable) {
+                    embed.fields.push({
+                        name: '🎥 Game Highlights',
+                        value: `**${recapVideo.title}**\n\n` +
+                               `📺 Channel: ${recapVideo.channelTitle || 'NHL'}`,
+                        inline: false
+                    });
+                    
+                    if (recapVideo.thumbnail) {
+                        embed.thumbnail = {
+                            url: recapVideo.thumbnail
+                        };
+                    }
+                    
+                    await message.reply({ embeds: [embed] });
+                    await message.channel.send(recapVideo.url);
+                    return;
+                    
+                } else if (recapVideo.isSearch) {
+                    embed.fields.push({
+                        name: '🎥 YouTube Highlights',
+                        value: `**${recapVideo.title}**\n\n` +
+                               `🔍 [Search Results](${recapVideo.url})\n\n` +
+                               `*The game highlights should be the first result. Copy that YouTube URL and paste it here for automatic embedding!*\n\n` +
+                               `**Search term:** "${recapVideo.searchQuery}"`,
+                        inline: false
+                    });
+                } else {
+                    embed.fields.push({
+                        name: '🎥 Video Recap',
+                        value: `**[${recapVideo.title}](${recapVideo.url})**`,
+                        inline: false
+                    });
+                    
+                    if (recapVideo.url.includes('youtube.com') || recapVideo.url.includes('youtu.be')) {
+                        embed.video = {
+                            url: recapVideo.url
+                        };
+                    }
+                }
+            } else {
+                embed.fields.push({
+                    name: '📺 Video Recap',
+                    value: 'No video recap available for this game yet.\n*Check back later as highlights are usually posted within a few hours of game completion.*',
+                    inline: false
+                });
+            }
+            
+
+            let stars = null;
+            if (gameDetails?.summary?.threeStars) {
+                stars = gameDetails.summary.threeStars;
+            } else if (gameDetails?.threeStars) {
+                stars = gameDetails.threeStars;
+            } else if (gameDetails?.boxscore?.threeStars) {
+                stars = gameDetails.boxscore.threeStars;
+            }
+            
+            if (stars && stars.length > 0) {
+                const starsText = stars.map((star, index) => {                    
+                    // Handle different possible star object structures
+                    let playerName = 'Unknown Player';
+                    
+                    if (typeof star === 'string') {
+                        playerName = star;
+                    } else if (star.name?.default) {
+                        // NHL API returns name as object with 'default' property
+                        playerName = star.name.default;
+                    } else if (star.name) {
+                        playerName = star.name;
+                    } else if (star.player?.name?.default) {
+                        playerName = star.player.name.default;
+                    } else if (star.player?.name) {
+                        playerName = star.player.name;
+                    } else if (star.firstName && star.lastName) {
+                        playerName = `${star.firstName} ${star.lastName}`;
+                    } else if (star.player?.firstName && star.player?.lastName) {
+                        playerName = `${star.player.firstName} ${star.player.lastName}`;
+                    }
+                    
+                    const teamAbbrev = star.teamAbbrev || star.team?.abbrev || star.teamAbbreviation || star.player?.team?.abbrev || '';
+                    const teamName = teamNames[teamAbbrev] || teamAbbrev || '';
+                    
+                    return `${index + 1}⭐ ${playerName}${teamName ? ` (${teamName})` : ''}`;
+                }).join('\n');
+                
+                embed.fields.push({
+                    name: '⭐ Three Stars',
+                    value: starsText,
+                    inline: false
+                });
+            }
+            
+            message.reply({ embeds: [embed] });
+            
+        } catch (error) {
+            console.error('Error processing recap request:', error);
+            message.reply('Sorry, there was an error getting the game recap. Please try again later.');
+        }
+        return;
+    }
+    
+    if (command === 'stats') {
+        if (!teamInput) {
+            message.reply('Please specify a team! Example: `!stats pen`');
+            return;
+        }
+        
+        const teamAbbr = teamMappings[teamInput] || teamInput.toUpperCase();
+        const teamName = teamNames[teamAbbr];
+        
+        if (!teamName) {
+            message.reply(`Sorry, I don't recognize the team "${teamInput}". Use \`!commands\` to see supported teams.`);
+            return;
+        }
+        
+        try {
+            const stats = await getTeamStats(teamAbbr);
+            
+            if (!stats) {
+                message.reply(`No stats found for the ${teamName}.`);
+                return;
+            }
+            
+            const embed = {
+                color: 0x0099ff,
+                title: `📈 ${teamName} Stats`,
+                fields: [
+                    {
+                        name: '🏒 Record',
+                        value: `${stats.wins}-${stats.losses}-${stats.otLosses}`,
+                        inline: true
+                    },
+                    {
+                        name: '🎯 Games Played',
+                        value: `${stats.gamesPlayed}`,
+                        inline: true
+                    },
+                    {
+                        name: '📊 Points',
+                        value: `${stats.points}`,
+                        inline: true
+                    },
+                    {
+                        name: '📈 Points %',
+                        value: `${(stats.pointPctg * 100).toFixed(1)}%`,
+                        inline: true
+                    },
+                    {
+                        name: '⚽ Goals For',
+                        value: `${stats.goalFor}`,
+                        inline: true
+                    },
+                    {
+                        name: '🥅 Goals Against',
+                        value: `${stats.goalAgainst}`,
+                        inline: true
+                    },
+                    {
+                        name: '📊 Goal Differential',
+                        value: `${stats.goalDifferential > 0 ? '+' : ''}${stats.goalDifferential}`,
+                        inline: true
+                    }
+                ],
+                timestamp: new Date().toISOString(),
+                footer: {
+                    text: 'NHL Bot - Current Season Stats'
+                }
+            };
+            
+            message.reply({ embeds: [embed] });
+            
+        } catch (error) {
+            console.error('Error processing stats request:', error);
+            message.reply('Sorry, there was an error getting the team statistics. Please try again later.');
+        }
+        return;
+    }
+    
+    if (command === 'playerstats') {
+        if (!teamInput) { // teamInput is actually player name in this case
+            message.reply('Please specify a player name! Example: `!playerstats crosby` or `!playerstats hughes`');
+            return;
+        }
+        
+        try {
+            const playerStats = await getPlayerStats(teamInput);
+            
+            if (!playerStats || playerStats.length === 0) {
+                message.reply(`No players found matching "${teamInput}".`);
+                return;
+            }
+            
+            if (playerStats.length === 1) {
+                const player = playerStats[0];
+                const stats = player.stats;
+                
+                const embed = {
+                    color: 0x0099ff,
+                    title: `👤 ${player.name} Stats`,
+                    description: `${player.position} • ${teamNames[player.team] || player.team}`,
+                    fields: [
+                        {
+                            name: '🏒 Games Played',
+                            value: `${stats.gamesPlayed || 0}`,
+                            inline: true
+                        },
+                        {
+                            name: '⚽ Goals',
+                            value: `${stats.goals || 0}`,
+                            inline: true
+                        },
+                        {
+                            name: '🎯 Assists',
+                            value: `${stats.assists || 0}`,
+                            inline: true
+                        },
+                        {
+                            name: '📊 Points',
+                            value: `${(stats.goals || 0) + (stats.assists || 0)}`,
+                            inline: true
+                        },
+                        {
+                            name: '+/-',
+                            value: `${stats.plusMinus || 0}`,
+                            inline: true
+                        },
+                        {
+                            name: '🏒 PIM',
+                            value: `${stats.penaltyMinutes || 0}`,
+                            inline: true
+                        }
+                    ],
+                    timestamp: new Date().toISOString(),
+                    footer: {
+                        text: `NHL Bot - ${Math.floor(player.season / 10000)}-${player.season % 10000} Season Stats`
+                    }
+                };
+                
+                // Add goalie-specific stats if position is goalie
+                if (player.position === 'G' && stats.wins !== undefined) {
+                    embed.fields = [
+                        {
+                            name: '🏒 Games Played',
+                            value: `${stats.gamesPlayed || 0}`,
+                            inline: true
+                        },
+                        {
+                            name: '🏆 Wins',
+                            value: `${stats.wins || 0}`,
+                            inline: true
+                        },
+                        {
+                            name: '❌ Losses',
+                            value: `${stats.losses || 0}`,
+                            inline: true
+                        },
+                        {
+                            name: '🥅 Save %',
+                            value: `${stats.savePct ? (stats.savePct * 100).toFixed(1) + '%' : 'N/A'}`,
+                            inline: true
+                        },
+                        {
+                            name: '🎯 GAA',
+                            value: `${stats.goalsAgainstAvg ? stats.goalsAgainstAvg.toFixed(2) : 'N/A'}`,
+                            inline: true
+                        },
+                        {
+                            name: '🚫 Shutouts',
+                            value: `${stats.shutouts || 0}`,
+                            inline: true
+                        }
+                    ];
+                }
+                
+                message.reply({ embeds: [embed] });
+            } else {
+                const embeds = playerStats.map(player => {
+                    const stats = player.stats;
+                    const points = (stats.goals || 0) + (stats.assists || 0);
+                    
+                    if (player.position === 'G') {
+                        return {
+                            color: 0x00ff88,
+                            title: `👤 ${player.name}`,
+                            description: `${player.position} • ${teamNames[player.team] || player.team}`,
+                            fields: [
+                                {
+                                    name: '🏒 GP',
+                                    value: `${stats.gamesPlayed || 0}`,
+                                    inline: true
+                                },
+                                {
+                                    name: '🏆 W-L',
+                                    value: `${stats.wins || 0}-${stats.losses || 0}`,
+                                    inline: true
+                                },
+                                {
+                                    name: '🥅 Save %',
+                                    value: `${stats.savePct ? (stats.savePct * 100).toFixed(1) + '%' : 'N/A'}`,
+                                    inline: true
+                                }
+                            ]
+                        };
+                    } else {
+                        return {
+                            color: 0x0099ff,
+                            title: `👤 ${player.name}`,
+                            description: `${player.position} • ${teamNames[player.team] || player.team}`,
+                            fields: [
+                                {
+                                    name: '🏒 GP',
+                                    value: `${stats.gamesPlayed || 0}`,
+                                    inline: true
+                                },
+                                {
+                                    name: '⚽ G-A',
+                                    value: `${stats.goals || 0}-${stats.assists || 0}`,
+                                    inline: true
+                                },
+                                {
+                                    name: '📊 PTS',
+                                    value: `${points}`,
+                                    inline: true
+                                }
+                            ]
+                        };
+                    }
+                });
+                
+                const headerEmbed = {
+                    color: 0xffd700,
+                    title: `🔍 Found ${playerStats.length} player(s) matching "${teamInput}"`,
+                    description: 'Here are their current season stats:',
+                    footer: { text: 'Use full name for detailed stats of a specific player' }
+                };
+                
+                message.reply({ embeds: [headerEmbed, ...embeds] });
+            }
+            
+        } catch (error) {
+            console.error('Error processing player stats request:', error);
+            message.reply('Sorry, there was an error getting the player statistics. Please try again later.');
+        }
+        return;
+    }
+    
+    if (command === 'careerstats') {
+        if (!teamInput) { // teamInput is actually player name in this case
+            message.reply('Please specify a player name! Example: `!careerstats crosby` or `!careerstats ovechkin`');
+            return;
+        }
+        
+        try {
+            const playerCareerStats = await getPlayerCareerStats(teamInput);
+            
+            if (!playerCareerStats || playerCareerStats.length === 0) {
+                message.reply(`No players found matching "${teamInput}".`);
+                return;
+            }
+            
+            if (playerCareerStats.length === 1) {
+                const player = playerCareerStats[0];
+                const stats = player.stats;
+                
+                // Calculate age if birth date is available
+                let ageString = '';
+                if (player.birthDate) {
+                    const birthDate = new Date(player.birthDate);
+                    const today = new Date();
+                    let age = today.getFullYear() - birthDate.getFullYear();
+                    const monthDiff = today.getMonth() - birthDate.getMonth();
+                    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                        age--;
+                    }
+                    ageString = ` (${age} years old)`;
+                }
+                
+                const birthPlace = [player.birthCity, player.birthCountry].filter(Boolean).join(', ') || 'N/A';
+                
+                const embed = {
+                    color: 0xff6b35, // Orange color for career stats
+                    title: `🏆 ${player.name} Career Stats`,
+                    description: `${player.position} • ${teamNames[player.team] || player.team}${ageString}`,
+                    fields: [
+                        {
+                            name: '🏒 Games Played',
+                            value: `${stats.gamesPlayed || 0}`,
+                            inline: true
+                        },
+                        {
+                            name: '⚽ Goals',
+                            value: `${stats.goals || 0}`,
+                            inline: true
+                        },
+                        {
+                            name: '🎯 Assists',
+                            value: `${stats.assists || 0}`,
+                            inline: true
+                        },
+                        {
+                            name: '📊 Points',
+                            value: `${(stats.goals || 0) + (stats.assists || 0)}`,
+                            inline: true
+                        },
+                        {
+                            name: '+/-',
+                            value: `${stats.plusMinus || 0}`,
+                            inline: true
+                        },
+                        {
+                            name: '🏒 PIM',
+                            value: `${stats.penaltyMinutes || 0}`,
+                            inline: true
+                        },
+                        {
+                            name: '📍 Born',
+                            value: birthPlace,
+                            inline: false
+                        }
+                    ],
+                    timestamp: new Date().toISOString(),
+                    footer: {
+                        text: 'NHL Bot - Career Totals'
+                    }
+                };
+                
+                // Add goalie-specific career stats if position is goalie
+                if (player.position === 'G' && stats.wins !== undefined) {
+                    embed.fields = [
+                        {
+                            name: '🏒 Games Played',
+                            value: `${stats.gamesPlayed || 0}`,
+                            inline: true
+                        },
+                        {
+                            name: '🏆 Wins',
+                            value: `${stats.wins || 0}`,
+                            inline: true
+                        },
+                        {
+                            name: '❌ Losses',
+                            value: `${stats.losses || 0}`,
+                            inline: true
+                        },
+                        {
+                            name: '🥅 Save %',
+                            value: `${stats.savePct ? (stats.savePct * 100).toFixed(1) + '%' : 'N/A'}`,
+                            inline: true
+                        },
+                        {
+                            name: '🎯 GAA',
+                            value: `${stats.goalsAgainstAvg ? stats.goalsAgainstAvg.toFixed(2) : 'N/A'}`,
+                            inline: true
+                        },
+                        {
+                            name: '🚫 Shutouts',
+                            value: `${stats.shutouts || 0}`,
+                            inline: true
+                        },
+                        {
+                            name: '📍 Born',
+                            value: birthPlace,
+                            inline: false
+                        }
+                    ];
+                }
+                
+                message.reply({ embeds: [embed] });
+            } else {
+                const embeds = playerCareerStats.map(player => {
+                    const stats = player.stats;
+                    const points = (stats.goals || 0) + (stats.assists || 0);
+                    
+                    if (player.position === 'G') {
+                        return {
+                            color: 0xff8c42,
+                            title: `🏆 ${player.name}`,
+                            description: `${player.position} • ${teamNames[player.team] || player.team}`,
+                            fields: [
+                                {
+                                    name: '🏒 GP',
+                                    value: `${stats.gamesPlayed || 0}`,
+                                    inline: true
+                                },
+                                {
+                                    name: '🏆 W-L',
+                                    value: `${stats.wins || 0}-${stats.losses || 0}`,
+                                    inline: true
+                                },
+                                {
+                                    name: '🚫 SO',
+                                    value: `${stats.shutouts || 0}`,
+                                    inline: true
+                                }
+                            ]
+                        };
+                    } else {
+                        return {
+                            color: 0xff6b35,
+                            title: `🏆 ${player.name}`,
+                            description: `${player.position} • ${teamNames[player.team] || player.team}`,
+                            fields: [
+                                {
+                                    name: '🏒 GP',
+                                    value: `${stats.gamesPlayed || 0}`,
+                                    inline: true
+                                },
+                                {
+                                    name: '⚽ G-A',
+                                    value: `${stats.goals || 0}-${stats.assists || 0}`,
+                                    inline: true
+                                },
+                                {
+                                    name: '📊 PTS',
+                                    value: `${points}`,
+                                    inline: true
+                                }
+                            ]
+                        };
+                    }
+                });
+                
+                const headerEmbed = {
+                    color: 0xffd700,
+                    title: `🔍 Found ${playerCareerStats.length} player(s) matching "${teamInput}"`,
+                    description: 'Here are their career totals:',
+                    footer: { text: 'Use full name for detailed career stats of a specific player' }
+                };
+                
+                message.reply({ embeds: [headerEmbed, ...embeds] });
+            }
+            
+        } catch (error) {
+            console.error('Error processing career stats request:', error);
+            message.reply('Sorry, there was an error getting the career statistics. Please try again later.');
+        }
+        return;
+    }
+    
+    if (command.includes('standings')) {
+        try {
+            const standings = await getStandings();
+            
+            if (!standings) {
+                message.reply('Sorry, there was an error getting the standings information.');
+                return;
+            }
+            
+            if (command === 'divisionstandings') {
+                if (!teamInput) {
+                    message.reply('Please specify a team! Example: `!divisionstandings pen`');
+                    return;
+                }
+                
+                const teamAbbr = teamMappings[teamInput] || teamInput.toUpperCase();
+                const teamName = teamNames[teamAbbr];
+                
+                if (!teamName) {
+                    message.reply(`Sorry, I don't recognize the team "${teamInput}".`);
+                    return;
+                }
+                
+                // Find team's division and show division standings
+                let divisionStandings = null;
+                for (const standing of standings.standings) {
+                    const teamInDivision = standing.teamAbbrev.default === teamAbbr;
+                    if (teamInDivision) {
+                        divisionStandings = standings.standings.filter(team => 
+                            team.divisionName === standing.divisionName
+                        ).sort((a, b) => b.points - a.points);
+                        break;
+                    }
+                }
+                
+                if (!divisionStandings) {
+                    message.reply('Could not find division standings.');
+                    return;
+                }
+                
+                const standingsText = divisionStandings.slice(0, 8).map((team, index) => 
+                    `${index + 1}. ${teamNames[team.teamAbbrev.default] || team.teamName.default} (${team.wins}-${team.losses}-${team.otLosses}) - ${team.points}pts`
+                ).join('\n');
+                
+                const embed = {
+                    color: 0x0099ff,
+                    title: `🏆 ${divisionStandings[0].divisionName} Division Standings`,
+                    description: '```' + standingsText + '```',
+                    footer: { text: 'NHL Bot - Division Standings' }
+                };
+                
+                message.reply({ embeds: [embed] });
+                return;
+            }
+            
+            if (command === 'conferencestandings') {
+                message.reply('Conference standings feature coming soon!');
+                return;
+            }
+            
+            if (command === 'leaguestandings') {
+                const highlightTeam = teamInput ? (teamMappings[teamInput] || teamInput.toUpperCase()) : null;
+                const isValidTeam = highlightTeam && teamNames[highlightTeam];
+                
+                const sortedTeams = standings.standings.sort((a, b) => b.points - a.points);
+                
+                if (isValidTeam) {
+                    // Find the highlighted team's position and info
+                    const teamIndex = sortedTeams.findIndex(team => team.teamAbbrev.default === highlightTeam);
+                    const highlightedTeam = sortedTeams[teamIndex];
+                    const teamName = teamNames[highlightedTeam.teamAbbrev.default];
+                    
+                    const highlightEmbed = {
+                        color: 0xffd700, // Gold color for highlight
+                        title: `🏒 ${teamName} - League Position`,
+                        description: `**Rank #${teamIndex + 1} of 32**`,
+                        fields: [
+                            {
+                                name: '📊 Record',
+                                value: `${highlightedTeam.wins}-${highlightedTeam.losses}-${highlightedTeam.otLosses}`,
+                                inline: true
+                            },
+                            {
+                                name: '🏆 Points',
+                                value: `${highlightedTeam.points}`,
+                                inline: true
+                            },
+                            {
+                                name: '📈 Points %',
+                                value: `${(highlightedTeam.pointPctg * 100).toFixed(1)}%`,
+                                inline: true
+                            }
+                        ],
+                        footer: { text: 'Your team is highlighted below in the full standings' }
+                    };
+                    
+                    const firstHalf = sortedTeams.slice(0, 16);
+                    const secondHalf = sortedTeams.slice(16);
+                    
+                    const formatTeamLine = (team, index) => {
+                        const teamName = teamNames[team.teamAbbrev.default] || team.teamName.default;
+                        // Use arrow emoji for highlighted team
+                        if (highlightTeam && team.teamAbbrev.default === highlightTeam) {
+                            return `➤ ${index + 1}. ${teamName} (${team.wins}-${team.losses}-${team.otLosses}) - ${team.points}pts`;
+                        }
+                        return `  ${index + 1}. ${teamName} (${team.wins}-${team.losses}-${team.otLosses}) - ${team.points}pts`;
+                    };
+                    
+                    const standingsText1 = firstHalf.map((team, index) => 
+                        formatTeamLine(team, index)
+                    ).join('\n');
+                    
+                    const standingsText2 = secondHalf.map((team, index) => 
+                        formatTeamLine(team, index + 16)
+                    ).join('\n');
+                    
+                    const embed1 = {
+                        color: 0x0099ff,
+                        title: '🏆 Full NHL League Standings (1-16)',
+                        description: '```' + standingsText1 + '```',
+                        footer: { text: 'NHL Bot - League Standings (Part 1 of 2)' }
+                    };
+                    
+                    const embed2 = {
+                        color: 0x0099ff,
+                        title: '🏆 Full NHL League Standings (17-32)',
+                        description: '```' + standingsText2 + '```',
+                        footer: { text: 'NHL Bot - League Standings (Part 2 of 2)' }
+                    };
+                    
+                    message.reply({ embeds: [highlightEmbed, embed1, embed2] });
+                } else {
+                    const firstHalf = sortedTeams.slice(0, 16);
+                    const secondHalf = sortedTeams.slice(16);
+                    
+                    const standingsText1 = firstHalf.map((team, index) => 
+                        `${index + 1}. ${teamNames[team.teamAbbrev.default] || team.teamName.default} (${team.wins}-${team.losses}-${team.otLosses}) - ${team.points}pts`
+                    ).join('\n');
+                    
+                    const standingsText2 = secondHalf.map((team, index) => 
+                        `${index + 17}. ${teamNames[team.teamAbbrev.default] || team.teamName.default} (${team.wins}-${team.losses}-${team.otLosses}) - ${team.points}pts`
+                    ).join('\n');
+                    
+                    const embed1 = {
+                        color: 0x0099ff,
+                        title: '🏆 NHL League Standings (1-16)',
+                        description: '```' + standingsText1 + '```',
+                        footer: { text: 'NHL Bot - League Standings (Part 1 of 2)' }
+                    };
+                    
+                    const embed2 = {
+                        color: 0x0099ff,
+                        title: '🏆 NHL League Standings (17-32)',
+                        description: '```' + standingsText2 + '```',
+                        footer: { text: 'NHL Bot - League Standings (Part 2 of 2)' }
+                    };
+                    
+                    if (teamInput && !isValidTeam) {
+                        message.reply(`Sorry, I don't recognize the team "${teamInput}". Showing full standings without highlighting.`);
+                    }
+                    
+                    message.reply({ embeds: [embed1, embed2] });
+                }
+                return;
+            }
+            
+        } catch (error) {
+            console.error('Error processing standings request:', error);
+            message.reply('Sorry, there was an error getting the standings information.');
+        }
     }
 });
 
