@@ -1409,7 +1409,66 @@ client.on('messageCreate', async (message) => {
             }
             
             if (command === 'conferencestandings') {
-                message.reply('Conference standings feature coming soon!');
+                if (!teamInput) {
+                    message.reply('Please specify a team! Example: `!conferencestandings pen`');
+                    return;
+                }
+                
+                const teamAbbr = teamMappings[teamInput] || teamInput.toUpperCase();
+                const teamName = teamNames[teamAbbr];
+                
+                if (!teamName) {
+                    message.reply(`Sorry, I don't recognize the team "${teamInput}".`);
+                    return;
+                }
+                
+                // Find team's conference and show conference standings
+                let conferenceName = null;
+                for (const standing of standings.standings) {
+                    if (standing.teamAbbrev.default === teamAbbr) {
+                        conferenceName = standing.conferenceName;
+                        break;
+                    }
+                }
+                
+                if (!conferenceName) {
+                    message.reply('Could not find conference standings.');
+                    return;
+                }
+                
+                const conferenceStandings = standings.standings
+                    .filter(team => team.conferenceName === conferenceName)
+                    .sort((a, b) => b.points - a.points);
+                
+                const firstHalf = conferenceStandings.slice(0, 8);
+                const secondHalf = conferenceStandings.slice(8, 16);
+                
+                const formatTeamLine = (team, index) => {
+                    const name = teamNames[team.teamAbbrev.default] || team.teamName.default;
+                    if (team.teamAbbrev.default === teamAbbr) {
+                        return `➤ ${index + 1}. ${name} (${team.wins}-${team.losses}-${team.otLosses}) - ${team.points}pts`;
+                    }
+                    return `  ${index + 1}. ${name} (${team.wins}-${team.losses}-${team.otLosses}) - ${team.points}pts`;
+                };
+                
+                const standingsText1 = firstHalf.map((team, index) => formatTeamLine(team, index)).join('\n');
+                const standingsText2 = secondHalf.map((team, index) => formatTeamLine(team, index + 8)).join('\n');
+                
+                const embed1 = {
+                    color: 0x0099ff,
+                    title: `🏆 ${conferenceName} Conference Standings (1-8)`,
+                    description: '```' + standingsText1 + '```',
+                    footer: { text: `${teamName} highlighted with ➤` }
+                };
+                
+                const embed2 = {
+                    color: 0x0099ff,
+                    title: `🏆 ${conferenceName} Conference Standings (9-16)`,
+                    description: '```' + standingsText2 + '```',
+                    footer: { text: 'NHL Bot - Conference Standings' }
+                };
+                
+                message.reply({ embeds: [embed1, embed2] });
                 return;
             }
             
