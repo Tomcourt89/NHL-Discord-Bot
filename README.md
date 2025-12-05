@@ -19,7 +19,7 @@ A Discord bot that provides NHL game information, statistics, and video recaps.
 ### League Information
 - Division standings
 - Full league standings with optional team highlighting
-- Conference standings (planned)
+- Conference standings
 
 ### Technical Features
 - Flexible team name recognition (abbreviations, nicknames, full names)
@@ -52,7 +52,7 @@ A Discord bot that provides NHL game information, statistics, and video recaps.
 ```
 !divisionstandings [team]   # Division standings for team's division
 !leaguestandings [team]     # Full league with optional team highlight  
-!conferencestandings [team] # Conference standings (coming soon)
+!conferencestandings [team] # Conference standings for team's conference
 ```
 
 ### Usage Examples
