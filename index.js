@@ -365,72 +365,144 @@ async function getGameRecap(teamAbbreviation) {
             const gameDate = new Date(lastGame.startTimeUTC);
             const dateString = gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             
+            // Extract short team names for more flexible matching
+            const awayShortName = awayTeamName.split(' ').pop().toLowerCase(); // e.g., "Ducks" from "Anaheim Ducks"
+            const homeShortName = homeTeamName.split(' ').pop().toLowerCase(); // e.g., "Penguins" from "Pittsburgh Penguins"
+            
+            // Calculate date range for YouTube search - videos are typically uploaded within 2 days of the game
+            // Use the game date and day after for the search window
+            const gameDateStart = new Date(gameDate);
+            gameDateStart.setUTCHours(0, 0, 0, 0);
+            const publishedAfter = gameDateStart.toISOString();
+            
+            // Allow up to 3 days after the game for video uploads
+            const gameDateEnd = new Date(gameDate);
+            gameDateEnd.setDate(gameDateEnd.getDate() + 3);
+            gameDateEnd.setUTCHours(23, 59, 59, 999);
+            const publishedBefore = gameDateEnd.toISOString();
+            
+            // Helper function to check if video publish date is within acceptable range of game date
+            function isVideoDateValid(videoPublishDate, gameDate) {
+                const videoDate = new Date(videoPublishDate);
+                const gameDateTime = new Date(gameDate);
+                
+                // Video should be published on game day or within 3 days after
+                const diffInMs = videoDate.getTime() - gameDateTime.getTime();
+                const diffInDays = diffInMs / (1000 * 60 * 60 * 24);
+                
+                // Allow videos published from game day up to 3 days after
+                return diffInDays >= -1 && diffInDays <= 3;
+            }
+            
+            // Helper function to check if video title matches the teams playing
+            function doesVideoMatchTeams(title, awayShort, homeShort, awayFull, homeFull) {
+                const titleLower = title.toLowerCase();
+                
+                // Check if title contains both teams (either short or full names)
+                const hasAwayTeam = titleLower.includes(awayShort) || titleLower.includes(awayFull.toLowerCase());
+                const hasHomeTeam = titleLower.includes(homeShort) || titleLower.includes(homeFull.toLowerCase());
+                
+                // Must have both teams mentioned
+                return hasAwayTeam && hasHomeTeam;
+            }
+            
             // Try to find actual YouTube video
             try {
                 // YouTube Data API search (you'll need to add YOUTUBE_API_KEY to .env)
                 const youtubeApiKey = process.env.YOUTUBE_API_KEY;
                 
                 if (youtubeApiKey) {
+                    // More specific search queries with team short names
                     const searchQueries = [
-                        `${awayTeamName} vs ${homeTeamName} highlights ${dateString}`,
-                        `${awayTeamName} ${homeTeamName} recap`,
-                        `NHL highlights ${awayTeamName} ${homeTeamName}`,
-                        `${awayTeamName} ${homeTeamName} goals`,
-                        `Devils Panthers highlights` // Fallback with shorter names
+                        `${awayShortName} vs ${homeShortName} highlights`,
+                        `${awayShortName} ${homeShortName} highlights`,
+                        `${homeShortName} vs ${awayShortName} highlights`,
+                        `${awayTeamName} vs ${homeTeamName} highlights`
                     ];
                     
                     for (const query of searchQueries) {
                         try {
-                            let youtubeSearchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=UCqFii6I0kpYUaHV3t_dUOOg&q=${encodeURIComponent(query)}&type=video&order=date&maxResults=10&key=${youtubeApiKey}`;
-                            let response = await axios.get(youtubeSearchUrl);
+                            // Search NHL's official channel with date filtering
+                            let youtubeSearchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=UCqFii6I0kpYUaHV3t_dUOOg&q=${encodeURIComponent(query)}&type=video&order=date&maxResults=15&publishedAfter=${encodeURIComponent(publishedAfter)}&publishedBefore=${encodeURIComponent(publishedBefore)}&key=${youtubeApiKey}`;
+                            let ytResponse = await axios.get(youtubeSearchUrl);
                             
-                            if (!response.data.items || response.data.items.length === 0) {
-                                youtubeSearchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query + ' NHL')}&type=video&order=relevance&maxResults=10&key=${youtubeApiKey}`;
-                                response = await axios.get(youtubeSearchUrl);
+                            // If no results from NHL channel, try broader search with date filter
+                            if (!ytResponse.data.items || ytResponse.data.items.length === 0) {
+                                youtubeSearchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query + ' NHL highlights')}&type=video&order=date&maxResults=15&publishedAfter=${encodeURIComponent(publishedAfter)}&publishedBefore=${encodeURIComponent(publishedBefore)}&key=${youtubeApiKey}`;
+                                ytResponse = await axios.get(youtubeSearchUrl);
                             }
                             
-                            if (response.data.items && response.data.items.length > 0) {
-                                const video = response.data.items.find(item => {
+                            if (ytResponse.data.items && ytResponse.data.items.length > 0) {
+                                // Find a video that matches both teams AND has a valid publish date
+                                const video = ytResponse.data.items.find(item => {
                                     const title = item.snippet.title.toLowerCase();
                                     const channelName = item.snippet.channelTitle.toLowerCase();
+                                    const publishDate = item.snippet.publishedAt;
                                     
-                                    return (title.includes('highlights') || title.includes('recap')) &&
-                                           (title.includes(awayTeamName.toLowerCase()) || 
-                                            title.includes(homeTeamName.toLowerCase()) ||
-                                            title.includes('devils') || title.includes('panthers')) &&
-                                           (channelName.includes('nhl') || channelName.includes('sportsnet') || 
-                                            channelName.includes('tsn') || channelName.includes('espn'));
-                                }) || response.data.items[0];
+                                    // Must be a highlight/recap video
+                                    const isHighlightVideo = title.includes('highlights') || title.includes('recap') || title.includes('condensed');
+                                    
+                                    // Must match both teams
+                                    const matchesTeams = doesVideoMatchTeams(title, awayShortName, homeShortName, awayTeamName, homeTeamName);
+                                    
+                                    // Must be from a trusted sports channel
+                                    const isTrustedChannel = channelName.includes('nhl') || channelName.includes('sportsnet') || 
+                                                            channelName.includes('tsn') || channelName.includes('espn');
+                                    
+                                    // Must have valid publish date (within range of game date)
+                                    const hasValidDate = isVideoDateValid(publishDate, gameDate);
+                                    
+                                    return isHighlightVideo && matchesTeams && isTrustedChannel && hasValidDate;
+                                });
                                 
-                                recapVideo = {
-                                    url: `https://www.youtube.com/watch?v=${video.id.videoId}`,
-                                    title: video.snippet.title,
-                                    thumbnail: video.snippet.thumbnails.medium?.url,
-                                    channelTitle: video.snippet.channelTitle,
-                                    isYouTube: true,
-                                    isEmbeddable: true
-                                };
-                                break;
+                                if (video) {
+                                    recapVideo = {
+                                        url: `https://www.youtube.com/watch?v=${video.id.videoId}`,
+                                        title: video.snippet.title,
+                                        thumbnail: video.snippet.thumbnails.medium?.url,
+                                        channelTitle: video.snippet.channelTitle,
+                                        publishedAt: video.snippet.publishedAt,
+                                        isYouTube: true,
+                                        isEmbeddable: true
+                                    };
+                                    break;
+                                }
                             }
                         } catch (error) {
+                            console.error(`YouTube search error for query "${query}":`, error.message);
                             continue;
                         }
                     }
+                    
+                    // If no video found with strict matching, provide a search link instead of wrong video
+                    if (!recapVideo) {
+                        const longDateString = gameDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+                        recapVideo = {
+                            url: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${awayShortName} vs ${homeShortName} highlights ${longDateString} NHL`)}`,
+                            title: `${awayTeamName} vs ${homeTeamName} Highlights`,
+                            searchQuery: `${awayShortName} vs ${homeShortName} highlights ${longDateString} NHL`,
+                            isYouTube: true,
+                            isSearch: true,
+                            noVideoFound: true
+                        };
+                    }
                 } else {
+                    const longDateString = gameDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
                     recapVideo = {
-                        url: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${awayTeamName} vs ${homeTeamName} highlights ${longDateString} NHL`)}`,
+                        url: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${awayShortName} vs ${homeShortName} highlights ${longDateString} NHL`)}`,
                         title: `${awayTeamName} vs ${homeTeamName} Highlights`,
-                        searchQuery: `${awayTeamName} vs ${homeTeamName} highlights ${longDateString} NHL`,
+                        searchQuery: `${awayShortName} vs ${homeShortName} highlights ${longDateString} NHL`,
                         isYouTube: true,
                         isSearch: true
                     };
                 }
                 
             } catch (error) {
+                const longDateString = gameDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
                 recapVideo = {
-                    url: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${awayTeamName} vs ${homeTeamName} highlights ${dateString} NHL`)}`,
+                    url: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${awayShortName} vs ${homeShortName} highlights ${longDateString} NHL`)}`,
                     title: `${awayTeamName} vs ${homeTeamName} Highlights`,
-                    searchQuery: `${awayTeamName} vs ${homeTeamName} highlights ${dateString} NHL`,
+                    searchQuery: `${awayShortName} vs ${homeShortName} highlights ${longDateString} NHL`,
                     isYouTube: true,
                     isSearch: true
                 };
@@ -832,11 +904,15 @@ client.on('messageCreate', async (message) => {
                     return;
                     
                 } else if (recapVideo.isSearch) {
+                    const searchNote = recapVideo.noVideoFound 
+                        ? `*Could not find an exact video match for this game date. The search results below should help you find the correct highlights.*`
+                        : `*The game highlights should be the first result. Copy that YouTube URL and paste it here for automatic embedding!*`;
+                    
                     embed.fields.push({
-                        name: '🎥 YouTube Highlights',
+                        name: '🔍 Search for Highlights',
                         value: `**${recapVideo.title}**\n\n` +
-                               `🔍 [Search Results](${recapVideo.url})\n\n` +
-                               `*The game highlights should be the first result. Copy that YouTube URL and paste it here for automatic embedding!*\n\n` +
+                               `[Click here to search YouTube](${recapVideo.url})\n\n` +
+                               searchNote + `\n\n` +
                                `**Search term:** "${recapVideo.searchQuery}"`,
                         inline: false
                     });
