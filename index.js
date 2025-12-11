@@ -611,7 +611,7 @@ client.on('messageCreate', async (message) => {
             fields: [
                 {
                     name: '⏰ Countdown Commands',
-                    value: '`!countdown [team]` - Shows countdown to next game\nExample: `!countdown pen`, `!countdown seattle`',
+                    value: '`!countdown [team]` - Shows countdown to next game\n`!countdownsite` - Link to the NHL Countdown website\nExample: `!countdown pen`, `!countdown seattle`',
                     inline: false
                 },
                 {
@@ -656,6 +656,28 @@ client.on('messageCreate', async (message) => {
         };
         
         message.reply({ embeds: [commandsEmbed] });
+        return;
+    }
+    
+    if (command === 'countdownsite') {
+        const embed = {
+            color: 0x0099ff,
+            title: '🏒 NHL Countdown Website',
+            description: 'Check out the NHL Countdown website for live countdowns to all upcoming games!',
+            fields: [
+                {
+                    name: '🌐 Website',
+                    value: '[NHL Countdown](https://tomcourt89.github.io/NHL-Countdown/)',
+                    inline: false
+                }
+            ],
+            footer: {
+                text: 'NHL Countdown Bot'
+            }
+        };
+        
+        message.reply({ embeds: [embed] });
+        await message.channel.send('https://tomcourt89.github.io/NHL-Countdown/');
         return;
     }
     
