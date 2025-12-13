@@ -124,9 +124,16 @@ const teamMappings = {
     'nucks': 'VAN',
     'van': 'VAN',
     'vancouver': 'VAN',
+    'jets': 'WPG',
+    'wpg': 'WPG',
+    'winnipeg': 'WPG',
     'kraken': 'SEA',
     'sea': 'SEA',
-    'seattle': 'SEA'
+    'seattle': 'SEA',
+    'utah': 'UTA',
+    'uta': 'UTA',
+    'utahhc': 'UTA',
+    'mammoth': 'UTA'
 };
 
 // Full team names mapping
@@ -160,8 +167,68 @@ const teamNames = {
     'CGY': 'Calgary Flames',
     'EDM': 'Edmonton Oilers',
     'VAN': 'Vancouver Canucks',
-    'SEA': 'Seattle Kraken'
+    'WPG': 'Winnipeg Jets',
+    'SEA': 'Seattle Kraken',
+    'UTA': 'Utah Mammoth'
 };
+
+// ESPN injuries cache (5 minute TTL)
+let injuriesCache = {
+    data: null,
+    timestamp: 0
+};
+
+const INJURIES_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function getInjuries() {
+    try {
+        const now = Date.now();
+        
+        // Return cached data if still valid
+        if (injuriesCache.data && (now - injuriesCache.timestamp) < INJURIES_CACHE_TTL) {
+            return injuriesCache.data;
+        }
+        
+        const response = await axios.get('https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/injuries');
+        
+        // Cache the response
+        injuriesCache.data = response.data;
+        injuriesCache.timestamp = now;
+        
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching injuries data:', error);
+        return null;
+    }
+}
+
+function getTeamInjuries(injuriesData, teamName) {
+    if (!injuriesData || !injuriesData.injuries) return [];
+    
+    const team = injuriesData.injuries.find(t => t.displayName === teamName);
+    return team ? team.injuries : [];
+}
+
+function searchPlayerInjury(injuriesData, playerQuery) {
+    if (!injuriesData || !injuriesData.injuries) return [];
+    
+    const query = playerQuery.toLowerCase();
+    const matches = [];
+    
+    for (const team of injuriesData.injuries) {
+        for (const injury of team.injuries) {
+            const playerName = injury.athlete?.displayName?.toLowerCase() || '';
+            if (playerName.includes(query)) {
+                matches.push({
+                    ...injury,
+                    teamName: team.displayName
+                });
+            }
+        }
+    }
+    
+    return matches;
+}
 
 async function getNextGame(teamAbbreviation) {
     try {
@@ -642,6 +709,11 @@ client.on('messageCreate', async (message) => {
                 {
                     name: '🏆 Standings',
                     value: '`!divisionstandings [team]` - Division standings\n`!conferencestandings [team]` - Conference standings\n`!leaguestandings [team]` - Full league standings (optional team highlight)',
+                    inline: false
+                },
+                {
+                    name: '🤕 Injury Reports',
+                    value: '`!injuries [team]` - List of injured players for a team\n`!injury [player]` - Detailed injury info for a specific player\nExample: `!injuries pens`, `!injury malkin`',
                     inline: false
                 },
                 {
@@ -1680,6 +1752,179 @@ client.on('messageCreate', async (message) => {
             console.error('Error processing standings request:', error);
             message.reply('Sorry, there was an error getting the standings information.');
         }
+    }
+    
+    // Injuries command - list injured players for a team
+    if (command === 'injuries') {
+        if (!teamInput) {
+            message.reply('Please specify a team! Example: `!injuries pens` for Pittsburgh Penguins');
+            return;
+        }
+        
+        const teamAbbr = teamMappings[teamInput] || teamInput.toUpperCase();
+        const teamName = teamNames[teamAbbr];
+        
+        if (!teamName) {
+            message.reply(`Sorry, I don't recognize the team "${teamInput}". Use \`!commands\` to see supported teams.`);
+            return;
+        }
+        
+        try {
+            const injuriesData = await getInjuries();
+            
+            if (!injuriesData) {
+                message.reply('Sorry, there was an error fetching injury data. Please try again later.');
+                return;
+            }
+            
+            const injuries = getTeamInjuries(injuriesData, teamName);
+            
+            if (injuries.length === 0) {
+                const embed = {
+                    color: 0x00ff00,
+                    title: `🏥 ${teamName} Injury Report`,
+                    description: 'No injuries reported.',
+                    timestamp: new Date().toISOString(),
+                    footer: { text: 'Injury data from ESPN' }
+                };
+                message.reply({ embeds: [embed] });
+                return;
+            }
+            
+            const injuryList = injuries.map(injury => {
+                const playerName = injury.athlete?.displayName || 'Unknown Player';
+                const status = injury.status || 'Unknown';
+                return `**${playerName}** - ${status}`;
+            }).join('\n');
+            
+            const embed = {
+                color: 0xff6b6b,
+                title: `🏥 ${teamName} Injury Report`,
+                description: injuryList,
+                fields: [
+                    {
+                        name: '📊 Total Injured',
+                        value: `${injuries.length} player${injuries.length > 1 ? 's' : ''}`,
+                        inline: true
+                    }
+                ],
+                timestamp: new Date().toISOString(),
+                footer: { text: 'Injury data from ESPN • Use !injury [player] for details' }
+            };
+            
+            message.reply({ embeds: [embed] });
+            
+        } catch (error) {
+            console.error('Error processing injuries command:', error);
+            message.reply('Sorry, there was an error getting the injury information.');
+        }
+        return;
+    }
+    
+    // Injury command - detailed info for a specific player
+    if (command === 'injury') {
+        if (!teamInput) {
+            message.reply('Please specify a player name! Example: `!injury malkin`');
+            return;
+        }
+        
+        // Combine all args for player name (in case of multi-word names)
+        const playerQuery = args.slice(1).join(' ');
+        
+        try {
+            const injuriesData = await getInjuries();
+            
+            if (!injuriesData) {
+                message.reply('Sorry, there was an error fetching injury data. Please try again later.');
+                return;
+            }
+            
+            const matches = searchPlayerInjury(injuriesData, playerQuery);
+            
+            if (matches.length === 0) {
+                message.reply(`No injury information found for "${playerQuery}". The player may not be injured or the name wasn't recognized.`);
+                return;
+            }
+            
+            const embeds = matches.slice(0, 5).map(injury => {
+                const playerName = injury.athlete?.displayName || 'Unknown Player';
+                const status = injury.status || 'Unknown';
+                const injuryType = injury.details?.type || 'Undisclosed';
+                const returnDate = injury.details?.returnDate;
+                const lastUpdated = injury.date ? new Date(injury.date).toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                }) : 'Unknown';
+                const longComment = injury.longComment || 'No additional details available.';
+                
+                const fields = [
+                    {
+                        name: '🏒 Team',
+                        value: injury.teamName || 'Unknown',
+                        inline: true
+                    },
+                    {
+                        name: '📋 Status',
+                        value: status,
+                        inline: true
+                    },
+                    {
+                        name: '🩹 Injury Type',
+                        value: injuryType,
+                        inline: true
+                    },
+                    {
+                        name: '📅 Last Updated',
+                        value: lastUpdated,
+                        inline: true
+                    }
+                ];
+                
+                if (returnDate) {
+                    const returnDateFormatted = new Date(returnDate).toLocaleDateString('en-US', {
+                        weekday: 'short',
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                    fields.push({
+                        name: '🔄 Expected Return',
+                        value: returnDateFormatted,
+                        inline: true
+                    });
+                }
+                
+                fields.push({
+                    name: '📝 Details',
+                    value: longComment.length > 1024 ? longComment.substring(0, 1021) + '...' : longComment,
+                    inline: false
+                });
+                
+                return {
+                    color: 0xff6b6b,
+                    title: `🏥 ${playerName} - Injury Report`,
+                    fields: fields,
+                    timestamp: new Date().toISOString(),
+                    footer: { text: 'Injury data from ESPN' }
+                };
+            });
+            
+            if (matches.length > 5) {
+                message.reply({ 
+                    content: `Found ${matches.length} players matching "${playerQuery}". Showing first 5:`,
+                    embeds: embeds 
+                });
+            } else {
+                message.reply({ embeds: embeds });
+            }
+            
+        } catch (error) {
+            console.error('Error processing injury command:', error);
+            message.reply('Sorry, there was an error getting the injury information.');
+        }
+        return;
     }
 });
 
