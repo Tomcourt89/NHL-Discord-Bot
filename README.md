@@ -55,6 +55,12 @@ A Discord bot that provides NHL game information, statistics, and video recaps.
 !conferencestandings [team] # Conference standings for team's conference
 ```
 
+### Injury Reports
+```
+!injuries [team]            # List of injured players for a team
+!injury [player]            # Detailed injury info for a specific player
+```
+
 ### Usage Examples
 ```
 !countdown pen              # Pittsburgh Penguins next game countdown
@@ -63,6 +69,8 @@ A Discord bot that provides NHL game information, statistics, and video recaps.
 !careerstats ovechkin       # Alexander Ovechkin career totals
 !stats caps                # Washington Capitals team statistics
 !leaguestandings devils     # Full NHL standings highlighting New Jersey
+!injuries pens             # Pittsburgh Penguins injury report
+!injury malkin             # Detailed injury info for Evgeni Malkin
 ```
 
 ## Setup
@@ -158,9 +166,10 @@ This bot uses multiple data sources:
 
 - **NHL API** (`api-web.nhle.com`): Game schedules, team stats, player information
 - **NHL Search API** (`search.d3.nhle.com`): Player search and statistics
+- **ESPN API** (`site.api.espn.com`): Injury reports and player injury status
 - **YouTube Data API v3** (optional): Video highlights and recaps
 
-No API keys are required for NHL data as their APIs are publicly accessible.
+No API keys are required for NHL or ESPN data as their APIs are publicly accessible.
 
 ## Development
 
@@ -177,7 +186,10 @@ No API keys are required for NHL data as their APIs are publicly accessible.
 - `getNextGame()` - Fetches upcoming game data
 - `getPreviousGame()` - Gets most recent completed game
 - `getGameRecap()` - Searches for video highlights with YouTube integration
-- `getTeamStats()` - Current season team statistics  
+- `getTeamStats()` - Current season team statistics
+- `getInjuries()` - Fetches injury data from ESPN (cached for 5 minutes)
+- `getTeamInjuries()` - Filters injuries for a specific team
+- `searchPlayerInjury()` - Searches all teams for a player's injury info  
 - `getPlayerStats()` - Current season player data
 - `getPlayerCareerStats()` - Complete career statistics
 - `getStandings()` - League standings and rankings
