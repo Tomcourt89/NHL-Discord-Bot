@@ -180,6 +180,189 @@ let injuriesCache = {
 
 const INJURIES_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+// Pro Hockey Rumors RSS cache (10 minute TTL)
+let newsCache = {
+    data: null,
+    timestamp: 0
+};
+
+const NEWS_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+// Team search keywords for RSS filtering (team names, cities, nicknames)
+const teamSearchKeywords = {
+    'PIT': ['Penguins', 'Pittsburgh'],
+    'WSH': ['Capitals', 'Washington'],
+    'NYR': ['Rangers', 'New York Rangers'],
+    'NJD': ['Devils', 'New Jersey'],
+    'PHI': ['Flyers', 'Philadelphia'],
+    'NYI': ['Islanders', 'New York Islanders'],
+    'BOS': ['Bruins', 'Boston'],
+    'BUF': ['Sabres', 'Buffalo'],
+    'TOR': ['Maple Leafs', 'Leafs', 'Toronto'],
+    'OTT': ['Senators', 'Ottawa'],
+    'MTL': ['Canadiens', 'Habs', 'Montreal'],
+    'TBL': ['Lightning', 'Tampa Bay', 'Tampa'],
+    'FLA': ['Panthers', 'Florida'],
+    'CAR': ['Hurricanes', 'Carolina'],
+    'CBJ': ['Blue Jackets', 'Columbus'],
+    'DET': ['Red Wings', 'Detroit'],
+    'NSH': ['Predators', 'Nashville'],
+    'STL': ['Blues', 'St. Louis', 'St Louis'],
+    'MIN': ['Wild', 'Minnesota'],
+    'CHI': ['Blackhawks', 'Chicago'],
+    'COL': ['Avalanche', 'Colorado'],
+    'DAL': ['Stars', 'Dallas'],
+    'LAK': ['Kings', 'Los Angeles', 'LA Kings'],
+    'ANA': ['Ducks', 'Anaheim'],
+    'SJS': ['Sharks', 'San Jose'],
+    'VGK': ['Golden Knights', 'Vegas', 'Golden Knights'],
+    'CGY': ['Flames', 'Calgary'],
+    'EDM': ['Oilers', 'Edmonton'],
+    'VAN': ['Canucks', 'Vancouver'],
+    'WPG': ['Jets', 'Winnipeg'],
+    'SEA': ['Kraken', 'Seattle'],
+    'UTA': ['Utah', 'Utah HC', 'Mammoth']
+};
+
+// Team-specific RSS feed slugs for Pro Hockey Rumors
+const teamRssSlugs = {
+    'PIT': 'pittsburgh-penguins',
+    'WSH': 'washington-capitals',
+    'NYR': 'new-york-rangers',
+    'NJD': 'new-jersey-devils',
+    'PHI': 'philadelphia-flyers',
+    'NYI': 'new-york-islanders',
+    'BOS': 'boston-bruins',
+    'BUF': 'buffalo-sabres',
+    'TOR': 'toronto-maple-leafs',
+    'OTT': 'ottawa-senators',
+    'MTL': 'montreal-canadiens',
+    'TBL': 'tampa-bay-lightning',
+    'FLA': 'florida-panthers',
+    'CAR': 'carolina-hurricanes',
+    'CBJ': 'columbus-blue-jackets',
+    'DET': 'detroit-red-wings',
+    'NSH': 'nashville-predators',
+    'STL': 'st-louis-blues',
+    'MIN': 'minnesota-wild',
+    'CHI': 'chicago-blackhawks',
+    'COL': 'colorado-avalanche',
+    'DAL': 'dallas-stars',
+    'LAK': 'los-angeles-kings',
+    'ANA': 'anaheim-ducks',
+    'SJS': 'san-jose-sharks',
+    'VGK': 'vegas-golden-knights',
+    'CGY': 'calgary-flames',
+    'EDM': 'edmonton-oilers',
+    'VAN': 'vancouver-canucks',
+    'WPG': 'winnipeg-jets',
+    'SEA': 'seattle-kraken',
+    'UTA': 'utah-hockey-club'
+};
+
+// Helper function to clean HTML entities and tags from RSS content
+function cleanHtmlContent(html) {
+    if (!html) return '';
+    return html
+        .replace(/<[^>]*>/g, '')  // Remove HTML tags
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#8217;/g, "'")
+        .replace(/&#8216;/g, "'")
+        .replace(/&#8220;/g, '"')
+        .replace(/&#8221;/g, '"')
+        .replace(/&#8230;/g, '...')
+        .replace(/&#8211;/g, '-')
+        .replace(/&#8212;/g, '—')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/Â /g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+// Helper function to parse RSS XML
+function parseRssXml(xml) {
+    const items = [];
+    const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+    let match;
+    
+    while ((match = itemRegex.exec(xml)) !== null) {
+        const itemXml = match[1];
+        
+        // Extract title (handle CDATA wrapped or plain)
+        const titleMatch = /<title><!\[CDATA\[(.*?)\]\]><\/title>|<title>(.*?)<\/title>/s.exec(itemXml);
+        const linkMatch = /<link>(.*?)<\/link>/s.exec(itemXml);
+        const pubDateMatch = /<pubDate>(.*?)<\/pubDate>/s.exec(itemXml);
+        const descMatch = /<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>|<description>([\s\S]*?)<\/description>/s.exec(itemXml);
+        
+        // Clean and truncate description
+        let description = descMatch ? cleanHtmlContent(descMatch[1] || descMatch[2] || '') : '';
+        
+        items.push({
+            title: titleMatch ? (titleMatch[1] || titleMatch[2] || '').trim() : '',
+            link: linkMatch ? linkMatch[1].trim() : '',
+            pubDate: pubDateMatch ? pubDateMatch[1].trim() : '',
+            description: description
+        });
+    }
+    
+    return items;
+}
+
+async function getNewsRSS() {
+    try {
+        const now = Date.now();
+        
+        // Return cached data if still valid
+        if (newsCache.data && (now - newsCache.timestamp) < NEWS_CACHE_TTL) {
+            return newsCache.data;
+        }
+        
+        const response = await axios.get('https://www.prohockeyrumors.com/feed');
+        const items = parseRssXml(response.data);
+        
+        // Cache the response
+        newsCache.data = items;
+        newsCache.timestamp = now;
+        
+        return items;
+    } catch (error) {
+        console.error('Error fetching news RSS:', error);
+        return null;
+    }
+}
+
+// Fetch team-specific RSS feed (not cached, used as fallback)
+async function getTeamNewsRSS(teamAbbr) {
+    try {
+        const slug = teamRssSlugs[teamAbbr];
+        if (!slug) return null;
+        
+        const response = await axios.get(`https://www.prohockeyrumors.com/category/${slug}/feed`);
+        return parseRssXml(response.data);
+    } catch (error) {
+        console.error(`Error fetching team news RSS for ${teamAbbr}:`, error);
+        return null;
+    }
+}
+
+function filterNewsForTeam(newsItems, teamAbbr) {
+    if (!newsItems || !Array.isArray(newsItems)) return [];
+    
+    const keywords = teamSearchKeywords[teamAbbr];
+    if (!keywords) return [];
+    
+    // Create regex pattern for team keywords (case insensitive)
+    const pattern = new RegExp(keywords.join('|'), 'i');
+    
+    return newsItems.filter(item => {
+        const title = item.title || '';
+        return pattern.test(title);
+    });
+}
+
 async function getInjuries() {
     try {
         const now = Date.now();
@@ -717,7 +900,12 @@ client.on('messageCreate', async (message) => {
                     inline: false
                 },
                 {
-                    name: '🔤 Supported Teams',
+                    name: '� News',
+                    value: '`!news` - Latest NHL news and rumors\n`!news [team]` - Team-specific news\nExample: `!news`, `!news pens`',
+                    inline: false
+                },
+                {
+                    name: '�🔤 Supported Teams',
                     value: 'Use team names, cities, or abbreviations:\n`pen/pens/penguins/pittsburgh`, `seattle/kraken/sea`, `caps/capitals/washington`, etc.',
                     inline: false
                 }
@@ -1923,6 +2111,131 @@ client.on('messageCreate', async (message) => {
         } catch (error) {
             console.error('Error processing injury command:', error);
             message.reply('Sorry, there was an error getting the injury information.');
+        }
+        return;
+    }
+    
+    // News command - show NHL news from Pro Hockey Rumors RSS
+    if (command === 'news') {
+        try {
+            const newsItems = await getNewsRSS();
+            
+            if (!newsItems || newsItems.length === 0) {
+                message.reply('Sorry, there was an error fetching news. Please try again later.');
+                return;
+            }
+            
+            // Check if team-specific news requested
+            if (teamInput) {
+                const teamAbbr = teamMappings[teamInput] || teamInput.toUpperCase();
+                const teamName = teamNames[teamAbbr];
+                
+                if (!teamName) {
+                    message.reply(`Sorry, I don't recognize the team "${teamInput}". Use \`!commands\` to see supported teams.`);
+                    return;
+                }
+                
+                // First try to find team news in the main feed
+                let teamNews = filterNewsForTeam(newsItems, teamAbbr);
+                
+                // If no news in main feed, fetch team-specific RSS feed
+                if (teamNews.length === 0) {
+                    const teamSpecificNews = await getTeamNewsRSS(teamAbbr);
+                    if (teamSpecificNews && teamSpecificNews.length > 0) {
+                        teamNews = teamSpecificNews;
+                    }
+                }
+                
+                if (teamNews.length === 0) {
+                    const embed = {
+                        color: 0x808080,
+                        title: `📰 ${teamName} News`,
+                        description: `No recent news found for the ${teamName}.\n\nUse \`!news\` for league-wide NHL news.`,
+                        timestamp: new Date().toISOString(),
+                        footer: { text: 'News from Pro Hockey Rumors' }
+                    };
+                    message.reply({ embeds: [embed] });
+                    return;
+                }
+                
+                const articlesToShow = teamNews.slice(0, 5);
+                
+                // Use embed fields for better formatting with previews
+                const fields = articlesToShow.map(item => {
+                    const title = item.title || 'Untitled';
+                    const link = item.link || '';
+                    const pubDate = item.pubDate ? new Date(item.pubDate).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit'
+                    }) : '';
+                    
+                    // Truncate description for preview (max ~200 chars)
+                    let preview = item.description || '';
+                    if (preview.length > 200) {
+                        preview = preview.substring(0, 197) + '...';
+                    }
+                    
+                    return {
+                        name: title.length > 256 ? title.substring(0, 253) + '...' : title,
+                        value: `${preview}\n\n🕐 ${pubDate} • [Read full article](${link})`,
+                        inline: false
+                    };
+                });
+                
+                const embed = {
+                    color: 0x1e90ff,
+                    title: `📰 ${teamName} News`,
+                    fields: fields,
+                    timestamp: new Date().toISOString(),
+                    footer: { text: `Showing ${articlesToShow.length} article${articlesToShow.length > 1 ? 's' : ''} • News from Pro Hockey Rumors` }
+                };
+                
+                message.reply({ embeds: [embed] });
+                
+            } else {
+                // League-wide news
+                const articlesToShow = newsItems.slice(0, 5);
+                
+                // Use embed fields for better formatting with previews
+                const fields = articlesToShow.map(item => {
+                    const title = item.title || 'Untitled';
+                    const link = item.link || '';
+                    const pubDate = item.pubDate ? new Date(item.pubDate).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit'
+                    }) : '';
+                    
+                    // Truncate description for preview (max ~200 chars)
+                    let preview = item.description || '';
+                    if (preview.length > 200) {
+                        preview = preview.substring(0, 197) + '...';
+                    }
+                    
+                    return {
+                        name: title.length > 256 ? title.substring(0, 253) + '...' : title,
+                        value: `${preview}\n\n🕐 ${pubDate} • [Read full article](${link})`,
+                        inline: false
+                    };
+                });
+                
+                const embed = {
+                    color: 0x1e90ff,
+                    title: '📰 NHL News & Rumors',
+                    fields: fields,
+                    timestamp: new Date().toISOString(),
+                    footer: { text: 'News from Pro Hockey Rumors • Use !news [team] for team-specific news' }
+                };
+                
+                message.reply({ embeds: [embed] });
+            }
+            
+        } catch (error) {
+            console.error('Error processing news command:', error);
+            message.reply('Sorry, there was an error getting news information.');
         }
         return;
     }
