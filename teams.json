@@ -1,0 +1,194 @@
+{
+    "PIT": {
+        "name": "Pittsburgh Penguins",
+        "aliases": ["pen", "pens", "penguins", "pittsburgh", "pit"],
+        "searchKeywords": ["Penguins", "Pittsburgh"],
+        "rssSlug": "pittsburgh-penguins"
+    },
+    "WSH": {
+        "name": "Washington Capitals",
+        "aliases": ["caps", "capitals", "washington", "wsh"],
+        "searchKeywords": ["Capitals", "Washington"],
+        "rssSlug": "washington-capitals"
+    },
+    "NYR": {
+        "name": "New York Rangers",
+        "aliases": ["rangers", "nyr", "newyorkrangers"],
+        "searchKeywords": ["Rangers", "New York Rangers"],
+        "rssSlug": "new-york-rangers"
+    },
+    "NJD": {
+        "name": "New Jersey Devils",
+        "aliases": ["devils", "njd", "newjersey", "jersey"],
+        "searchKeywords": ["Devils", "New Jersey"],
+        "rssSlug": "new-jersey-devils"
+    },
+    "PHI": {
+        "name": "Philadelphia Flyers",
+        "aliases": ["flyers", "phi", "philadelphia", "philly"],
+        "searchKeywords": ["Flyers", "Philadelphia"],
+        "rssSlug": "philadelphia-flyers"
+    },
+    "NYI": {
+        "name": "New York Islanders",
+        "aliases": ["islanders", "isles", "nyi", "newyorkislanders"],
+        "searchKeywords": ["Islanders", "New York Islanders"],
+        "rssSlug": "new-york-islanders"
+    },
+    "BOS": {
+        "name": "Boston Bruins",
+        "aliases": ["bruins", "bos", "boston"],
+        "searchKeywords": ["Bruins", "Boston"],
+        "rssSlug": "boston-bruins"
+    },
+    "BUF": {
+        "name": "Buffalo Sabres",
+        "aliases": ["sabres", "sabers", "buf", "buffalo"],
+        "searchKeywords": ["Sabres", "Buffalo"],
+        "rssSlug": "buffalo-sabres"
+    },
+    "TOR": {
+        "name": "Toronto Maple Leafs",
+        "aliases": ["leafs", "mapleleafs", "tor", "toronto", "buds"],
+        "searchKeywords": ["Maple Leafs", "Leafs", "Toronto"],
+        "rssSlug": "toronto-maple-leafs"
+    },
+    "OTT": {
+        "name": "Ottawa Senators",
+        "aliases": ["senators", "sens", "ott", "ottawa"],
+        "searchKeywords": ["Senators", "Ottawa"],
+        "rssSlug": "ottawa-senators"
+    },
+    "MTL": {
+        "name": "Montreal Canadiens",
+        "aliases": ["canadiens", "habs", "mtl", "montreal"],
+        "searchKeywords": ["Canadiens", "Habs", "Montreal"],
+        "rssSlug": "montreal-canadiens"
+    },
+    "TBL": {
+        "name": "Tampa Bay Lightning",
+        "aliases": ["lightning", "bolts", "tbl", "tampa", "tampabay"],
+        "searchKeywords": ["Lightning", "Tampa Bay", "Tampa"],
+        "rssSlug": "tampa-bay-lightning"
+    },
+    "FLA": {
+        "name": "Florida Panthers",
+        "aliases": ["panthers", "cats", "fla", "florida"],
+        "searchKeywords": ["Panthers", "Florida"],
+        "rssSlug": "florida-panthers"
+    },
+    "CAR": {
+        "name": "Carolina Hurricanes",
+        "aliases": ["hurricanes", "canes", "car", "carolina"],
+        "searchKeywords": ["Hurricanes", "Carolina"],
+        "rssSlug": "carolina-hurricanes"
+    },
+    "CBJ": {
+        "name": "Columbus Blue Jackets",
+        "aliases": ["jackets", "bluejackets", "cbj", "columbus"],
+        "searchKeywords": ["Blue Jackets", "Columbus"],
+        "rssSlug": "columbus-blue-jackets"
+    },
+    "DET": {
+        "name": "Detroit Red Wings",
+        "aliases": ["wings", "redwings", "det", "detroit"],
+        "searchKeywords": ["Red Wings", "Detroit"],
+        "rssSlug": "detroit-red-wings"
+    },
+    "NSH": {
+        "name": "Nashville Predators",
+        "aliases": ["predators", "preds", "nsh", "nashville"],
+        "searchKeywords": ["Predators", "Nashville"],
+        "rssSlug": "nashville-predators"
+    },
+    "STL": {
+        "name": "St. Louis Blues",
+        "aliases": ["blues", "stl", "stlouis", "saintlouis"],
+        "searchKeywords": ["Blues", "St. Louis", "St Louis"],
+        "rssSlug": "st-louis-blues"
+    },
+    "MIN": {
+        "name": "Minnesota Wild",
+        "aliases": ["wild", "min", "minnesota"],
+        "searchKeywords": ["Wild", "Minnesota"],
+        "rssSlug": "minnesota-wild"
+    },
+    "CHI": {
+        "name": "Chicago Blackhawks",
+        "aliases": ["blackhawks", "hawks", "chi", "chicago"],
+        "searchKeywords": ["Blackhawks", "Chicago"],
+        "rssSlug": "chicago-blackhawks"
+    },
+    "COL": {
+        "name": "Colorado Avalanche",
+        "aliases": ["avalanche", "avs", "col", "colorado"],
+        "searchKeywords": ["Avalanche", "Colorado"],
+        "rssSlug": "colorado-avalanche"
+    },
+    "DAL": {
+        "name": "Dallas Stars",
+        "aliases": ["stars", "dal", "dallas"],
+        "searchKeywords": ["Stars", "Dallas"],
+        "rssSlug": "dallas-stars"
+    },
+    "LAK": {
+        "name": "Los Angeles Kings",
+        "aliases": ["kings", "lak", "losangeles", "la"],
+        "searchKeywords": ["Kings", "Los Angeles", "LA Kings"],
+        "rssSlug": "los-angeles-kings"
+    },
+    "ANA": {
+        "name": "Anaheim Ducks",
+        "aliases": ["ducks", "ana", "anaheim"],
+        "searchKeywords": ["Ducks", "Anaheim"],
+        "rssSlug": "anaheim-ducks"
+    },
+    "SJS": {
+        "name": "San Jose Sharks",
+        "aliases": ["sharks", "sjs", "sanjose"],
+        "searchKeywords": ["Sharks", "San Jose"],
+        "rssSlug": "san-jose-sharks"
+    },
+    "VGK": {
+        "name": "Vegas Golden Knights",
+        "aliases": ["knights", "goldenknights", "vgk", "vegas", "lasvegas"],
+        "searchKeywords": ["Golden Knights", "Vegas", "Golden Knights"],
+        "rssSlug": "vegas-golden-knights"
+    },
+    "CGY": {
+        "name": "Calgary Flames",
+        "aliases": ["flames", "cgy", "calgary"],
+        "searchKeywords": ["Flames", "Calgary"],
+        "rssSlug": "calgary-flames"
+    },
+    "EDM": {
+        "name": "Edmonton Oilers",
+        "aliases": ["oilers", "edm", "edmonton"],
+        "searchKeywords": ["Oilers", "Edmonton"],
+        "rssSlug": "edmonton-oilers"
+    },
+    "VAN": {
+        "name": "Vancouver Canucks",
+        "aliases": ["canucks", "nucks", "van", "vancouver"],
+        "searchKeywords": ["Canucks", "Vancouver"],
+        "rssSlug": "vancouver-canucks"
+    },
+    "WPG": {
+        "name": "Winnipeg Jets",
+        "aliases": ["jets", "wpg", "winnipeg"],
+        "searchKeywords": ["Jets", "Winnipeg"],
+        "rssSlug": "winnipeg-jets"
+    },
+    "SEA": {
+        "name": "Seattle Kraken",
+        "aliases": ["kraken", "sea", "seattle"],
+        "searchKeywords": ["Kraken", "Seattle"],
+        "rssSlug": "seattle-kraken"
+    },
+    "UTA": {
+        "name": "Utah Hockey Club",
+        "aliases": ["utah", "uta", "utahhc", "mammoth"],
+        "searchKeywords": ["Utah", "Utah HC", "Mammoth"],
+        "rssSlug": "utah-hockey-club"
+    }
+}

@@ -2,6 +2,40 @@ const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const axios = require('axios');
 require('dotenv').config();
 
+// Load team data from JSON file
+const teamsData = require('./teams.json');
+
+// Helper function to get team abbreviation from alias
+function getTeamAbbr(input) {
+    const inputLower = input.toLowerCase();
+    // Check if it's already a valid abbreviation
+    if (teamsData[input.toUpperCase()]) {
+        return input.toUpperCase();
+    }
+    // Search through aliases
+    for (const [abbr, data] of Object.entries(teamsData)) {
+        if (data.aliases.includes(inputLower)) {
+            return abbr;
+        }
+    }
+    return null;
+}
+
+// Helper function to get team name from abbreviation
+function getTeamName(abbr) {
+    return teamsData[abbr]?.name || null;
+}
+
+// Helper function to get search keywords for RSS filtering
+function getTeamSearchKeywords(abbr) {
+    return teamsData[abbr]?.searchKeywords || [];
+}
+
+// Helper function to get RSS slug
+function getTeamRssSlug(abbr) {
+    return teamsData[abbr]?.rssSlug || null;
+}
+
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -9,168 +43,6 @@ const client = new Client({
         GatewayIntentBits.MessageContent
     ]
 });
-
-// Team mappings for easier command usage
-const teamMappings = {
-    'pen': 'PIT',
-    'pens': 'PIT',
-    'penguins': 'PIT',
-    'pittsburgh': 'PIT',
-    'pit': 'PIT',
-    'caps': 'WSH',
-    'capitals': 'WSH',
-    'washington': 'WSH',
-    'wsh': 'WSH',
-    'rangers': 'NYR',
-    'nyr': 'NYR',
-    'newyorkrangers': 'NYR',
-    'devils': 'NJD',
-    'njd': 'NJD',
-    'newjersey': 'NJD',
-    'jersey': 'NJD',
-    'flyers': 'PHI',
-    'phi': 'PHI',
-    'philadelphia': 'PHI',
-    'philly': 'PHI',
-    'islanders': 'NYI',
-    'isles': 'NYI',
-    'nyi': 'NYI',
-    'newyorkislanders': 'NYI',
-    'bruins': 'BOS',
-    'bos': 'BOS',
-    'boston': 'BOS',
-    'sabres': 'BUF',
-    'sabers': 'BUF',
-    'buf': 'BUF',
-    'buffalo': 'BUF',
-    'leafs': 'TOR',
-    'mapleleafs': 'TOR',
-    'tor': 'TOR',
-    'toronto': 'TOR',
-    'buds': 'TOR',
-    'senators': 'OTT',
-    'sens': 'OTT',
-    'ott': 'OTT',
-    'ottawa': 'OTT',
-    'canadiens': 'MTL',
-    'habs': 'MTL',
-    'mtl': 'MTL',
-    'montreal': 'MTL',
-    'lightning': 'TBL',
-    'bolts': 'TBL',
-    'tbl': 'TBL',
-    'tampa': 'TBL',
-    'tampabay': 'TBL',
-    'panthers': 'FLA',
-    'cats': 'FLA',
-    'fla': 'FLA',
-    'florida': 'FLA',
-    'hurricanes': 'CAR',
-    'canes': 'CAR',
-    'car': 'CAR',
-    'carolina': 'CAR',
-    'jackets': 'CBJ',
-    'bluejackets': 'CBJ',
-    'cbj': 'CBJ',
-    'columbus': 'CBJ',
-    'wings': 'DET',
-    'redwings': 'DET',
-    'det': 'DET',
-    'detroit': 'DET',
-    'predators': 'NSH',
-    'preds': 'NSH',
-    'nsh': 'NSH',
-    'nashville': 'NSH',
-    'blues': 'STL',
-    'stl': 'STL',
-    'stlouis': 'STL',
-    'saintlouis': 'STL',
-    'wild': 'MIN',
-    'min': 'MIN',
-    'minnesota': 'MIN',
-    'blackhawks': 'CHI',
-    'hawks': 'CHI',
-    'chi': 'CHI',
-    'chicago': 'CHI',
-    'avalanche': 'COL',
-    'avs': 'COL',
-    'col': 'COL',
-    'colorado': 'COL',
-    'stars': 'DAL',
-    'dal': 'DAL',
-    'dallas': 'DAL',
-    'kings': 'LAK',
-    'lak': 'LAK',
-    'losangeles': 'LAK',
-    'la': 'LAK',
-    'ducks': 'ANA',
-    'ana': 'ANA',
-    'anaheim': 'ANA',
-    'sharks': 'SJS',
-    'sjs': 'SJS',
-    'sanjose': 'SJS',
-    'knights': 'VGK',
-    'goldenknights': 'VGK',
-    'vgk': 'VGK',
-    'vegas': 'VGK',
-    'lasvegas': 'VGK',
-    'flames': 'CGY',
-    'cgy': 'CGY',
-    'calgary': 'CGY',
-    'oilers': 'EDM',
-    'edm': 'EDM',
-    'edmonton': 'EDM',
-    'canucks': 'VAN',
-    'nucks': 'VAN',
-    'van': 'VAN',
-    'vancouver': 'VAN',
-    'jets': 'WPG',
-    'wpg': 'WPG',
-    'winnipeg': 'WPG',
-    'kraken': 'SEA',
-    'sea': 'SEA',
-    'seattle': 'SEA',
-    'utah': 'UTA',
-    'uta': 'UTA',
-    'utahhc': 'UTA',
-    'mammoth': 'UTA'
-};
-
-// Full team names mapping
-const teamNames = {
-    'PIT': 'Pittsburgh Penguins',
-    'WSH': 'Washington Capitals',
-    'NYR': 'New York Rangers',
-    'NJD': 'New Jersey Devils',
-    'PHI': 'Philadelphia Flyers',
-    'NYI': 'New York Islanders',
-    'BOS': 'Boston Bruins',
-    'BUF': 'Buffalo Sabres',
-    'TOR': 'Toronto Maple Leafs',
-    'OTT': 'Ottawa Senators',
-    'MTL': 'Montreal Canadiens',
-    'TBL': 'Tampa Bay Lightning',
-    'FLA': 'Florida Panthers',
-    'CAR': 'Carolina Hurricanes',
-    'CBJ': 'Columbus Blue Jackets',
-    'DET': 'Detroit Red Wings',
-    'NSH': 'Nashville Predators',
-    'STL': 'St. Louis Blues',
-    'MIN': 'Minnesota Wild',
-    'CHI': 'Chicago Blackhawks',
-    'COL': 'Colorado Avalanche',
-    'DAL': 'Dallas Stars',
-    'LAK': 'Los Angeles Kings',
-    'ANA': 'Anaheim Ducks',
-    'SJS': 'San Jose Sharks',
-    'VGK': 'Vegas Golden Knights',
-    'CGY': 'Calgary Flames',
-    'EDM': 'Edmonton Oilers',
-    'VAN': 'Vancouver Canucks',
-    'WPG': 'Winnipeg Jets',
-    'SEA': 'Seattle Kraken',
-    'UTA': 'Utah Mammoth'
-};
 
 // ESPN injuries cache (5 minute TTL)
 let injuriesCache = {
@@ -187,78 +59,6 @@ let newsCache = {
 };
 
 const NEWS_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
-
-// Team search keywords for RSS filtering (team names, cities, nicknames)
-const teamSearchKeywords = {
-    'PIT': ['Penguins', 'Pittsburgh'],
-    'WSH': ['Capitals', 'Washington'],
-    'NYR': ['Rangers', 'New York Rangers'],
-    'NJD': ['Devils', 'New Jersey'],
-    'PHI': ['Flyers', 'Philadelphia'],
-    'NYI': ['Islanders', 'New York Islanders'],
-    'BOS': ['Bruins', 'Boston'],
-    'BUF': ['Sabres', 'Buffalo'],
-    'TOR': ['Maple Leafs', 'Leafs', 'Toronto'],
-    'OTT': ['Senators', 'Ottawa'],
-    'MTL': ['Canadiens', 'Habs', 'Montreal'],
-    'TBL': ['Lightning', 'Tampa Bay', 'Tampa'],
-    'FLA': ['Panthers', 'Florida'],
-    'CAR': ['Hurricanes', 'Carolina'],
-    'CBJ': ['Blue Jackets', 'Columbus'],
-    'DET': ['Red Wings', 'Detroit'],
-    'NSH': ['Predators', 'Nashville'],
-    'STL': ['Blues', 'St. Louis', 'St Louis'],
-    'MIN': ['Wild', 'Minnesota'],
-    'CHI': ['Blackhawks', 'Chicago'],
-    'COL': ['Avalanche', 'Colorado'],
-    'DAL': ['Stars', 'Dallas'],
-    'LAK': ['Kings', 'Los Angeles', 'LA Kings'],
-    'ANA': ['Ducks', 'Anaheim'],
-    'SJS': ['Sharks', 'San Jose'],
-    'VGK': ['Golden Knights', 'Vegas', 'Golden Knights'],
-    'CGY': ['Flames', 'Calgary'],
-    'EDM': ['Oilers', 'Edmonton'],
-    'VAN': ['Canucks', 'Vancouver'],
-    'WPG': ['Jets', 'Winnipeg'],
-    'SEA': ['Kraken', 'Seattle'],
-    'UTA': ['Utah', 'Utah HC', 'Mammoth']
-};
-
-// Team-specific RSS feed slugs for Pro Hockey Rumors
-const teamRssSlugs = {
-    'PIT': 'pittsburgh-penguins',
-    'WSH': 'washington-capitals',
-    'NYR': 'new-york-rangers',
-    'NJD': 'new-jersey-devils',
-    'PHI': 'philadelphia-flyers',
-    'NYI': 'new-york-islanders',
-    'BOS': 'boston-bruins',
-    'BUF': 'buffalo-sabres',
-    'TOR': 'toronto-maple-leafs',
-    'OTT': 'ottawa-senators',
-    'MTL': 'montreal-canadiens',
-    'TBL': 'tampa-bay-lightning',
-    'FLA': 'florida-panthers',
-    'CAR': 'carolina-hurricanes',
-    'CBJ': 'columbus-blue-jackets',
-    'DET': 'detroit-red-wings',
-    'NSH': 'nashville-predators',
-    'STL': 'st-louis-blues',
-    'MIN': 'minnesota-wild',
-    'CHI': 'chicago-blackhawks',
-    'COL': 'colorado-avalanche',
-    'DAL': 'dallas-stars',
-    'LAK': 'los-angeles-kings',
-    'ANA': 'anaheim-ducks',
-    'SJS': 'san-jose-sharks',
-    'VGK': 'vegas-golden-knights',
-    'CGY': 'calgary-flames',
-    'EDM': 'edmonton-oilers',
-    'VAN': 'vancouver-canucks',
-    'WPG': 'winnipeg-jets',
-    'SEA': 'seattle-kraken',
-    'UTA': 'utah-hockey-club'
-};
 
 // Helper function to clean HTML entities and tags from RSS content
 function cleanHtmlContent(html) {
@@ -337,7 +137,7 @@ async function getNewsRSS() {
 // Fetch team-specific RSS feed (not cached, used as fallback)
 async function getTeamNewsRSS(teamAbbr) {
     try {
-        const slug = teamRssSlugs[teamAbbr];
+        const slug = getTeamRssSlug(teamAbbr);
         if (!slug) return null;
         
         const response = await axios.get(`https://www.prohockeyrumors.com/category/${slug}/feed`);
@@ -351,8 +151,8 @@ async function getTeamNewsRSS(teamAbbr) {
 function filterNewsForTeam(newsItems, teamAbbr) {
     if (!newsItems || !Array.isArray(newsItems)) return [];
     
-    const keywords = teamSearchKeywords[teamAbbr];
-    if (!keywords) return [];
+    const keywords = getTeamSearchKeywords(teamAbbr);
+    if (!keywords || keywords.length === 0) return [];
     
     // Create regex pattern for team keywords (case insensitive)
     const pattern = new RegExp(keywords.join('|'), 'i');
@@ -415,14 +215,11 @@ function searchPlayerInjury(injuriesData, playerQuery) {
 
 async function getNextGame(teamAbbreviation) {
     try {
-        const today = new Date().toISOString().split('T')[0];
-        const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        
-        const response = await axios.get(`https://api-web.nhle.com/v1/club-schedule/${teamAbbreviation}/month/now`);
+        const response = await axios.get(`https://api-web.nhle.com/v1/club-schedule-season/${teamAbbreviation}/now`);
         const games = response.data.games;
         
         const now = new Date();
-        const upcomingGames = games.filter(game => new Date(game.startTimeUTC) > now);
+        const upcomingGames = games.filter(game => new Date(game.startTimeUTC) >= now);
         
         if (upcomingGames.length === 0) {
             return null;
@@ -437,7 +234,7 @@ async function getNextGame(teamAbbreviation) {
 
 async function getPreviousGame(teamAbbreviation) {
     try {
-        const response = await axios.get(`https://api-web.nhle.com/v1/club-schedule/${teamAbbreviation}/month/now`);
+        const response = await axios.get(`https://api-web.nhle.com/v1/club-schedule-season/${teamAbbreviation}/now`);
         const games = response.data.games;
         
         const now = new Date();
@@ -592,7 +389,7 @@ async function getPlayerCareerStats(playerQuery) {
 
 async function getGameRecap(teamAbbreviation) {
     try {
-        const response = await axios.get(`https://api-web.nhle.com/v1/club-schedule/${teamAbbreviation}/month/now`);
+        const response = await axios.get(`https://api-web.nhle.com/v1/club-schedule-season/${teamAbbreviation}/now`);
         const games = response.data.games;
         
         const now = new Date();
@@ -610,8 +407,8 @@ async function getGameRecap(teamAbbreviation) {
             let recapVideo = null;
             
             // Search for YouTube video of the game highlights using YouTube Data API
-            const awayTeamName = teamNames[lastGame.awayTeam.abbrev] || lastGame.awayTeam.abbrev;
-            const homeTeamName = teamNames[lastGame.homeTeam.abbrev] || lastGame.homeTeam.abbrev;
+            const awayTeamName = getTeamName(lastGame.awayTeam.abbrev) || lastGame.awayTeam.abbrev;
+            const homeTeamName = getTeamName(lastGame.homeTeam.abbrev) || lastGame.homeTeam.abbrev;
             const gameDate = new Date(lastGame.startTimeUTC);
             const dateString = gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             
@@ -861,7 +658,7 @@ client.on('messageCreate', async (message) => {
             fields: [
                 {
                     name: '⏰ Countdown Commands',
-                    value: '`!countdown [team]` - Shows countdown to next game\n`!countdownsite` - Link to the NHL Countdown website\nExample: `!countdown pen`, `!countdown seattle`',
+                    value: '`!countdown [team]` - Shows countdown to next game\n`!schedule [team]` - Shows next 5 upcoming games\n`!countdownsite` - Link to the NHL Countdown website\nExample: `!countdown pen`, `!schedule seattle`',
                     inline: false
                 },
                 {
@@ -947,8 +744,8 @@ client.on('messageCreate', async (message) => {
             return;
         }
         
-        const teamAbbr = teamMappings[teamInput] || teamInput.toUpperCase();
-        const teamName = teamNames[teamAbbr];
+        const teamAbbr = getTeamAbbr(teamInput);
+        const teamName = teamAbbr ? getTeamName(teamAbbr) : null;
         
         if (!teamName) {
             message.reply(`Sorry, I don't recognize the team "${teamInput}". Use \`!commands\` to see supported teams.`);
@@ -967,12 +764,12 @@ client.on('messageCreate', async (message) => {
             const countdown = formatCountdown(game.startTimeUTC);
             const opponent = game.homeTeam.abbrev === teamAbbr ? game.awayTeam : game.homeTeam;
             const isHome = game.homeTeam.abbrev === teamAbbr;
-            const hostCity = isHome ? teamName.split(' ').pop() : teamNames[opponent.abbrev].split(' ').pop();
+            const hostCity = isHome ? teamName.split(' ').pop() : (getTeamName(opponent.abbrev) || '').split(' ').pop();
             
             const embed = {
                 color: 0x0099ff,
                 title: `⏰ ${teamName} Countdown`,
-                description: `Next game: ${isHome ? 'vs' : '@'} ${teamNames[opponent.abbrev] || opponent.placeName.default}`,
+                description: `Next game: ${isHome ? 'vs' : '@'} ${getTeamName(opponent.abbrev) || opponent.placeName.default}`,
                 fields: [
                     {
                         name: '🕐 Time Until Game',
@@ -1019,14 +816,69 @@ client.on('messageCreate', async (message) => {
         return;
     }
     
+    if (command === 'schedule') {
+        if (!teamInput) {
+            message.reply('Please specify a team! Example: `!schedule pen` for Pittsburgh Penguins');
+            return;
+        }
+        
+        const teamAbbr = getTeamAbbr(teamInput);
+        const teamName = teamAbbr ? getTeamName(teamAbbr) : null;
+        
+        if (!teamName) {
+            message.reply(`Sorry, I don't recognize the team "${teamInput}". Use \`!commands\` to see supported teams.`);
+            return;
+        }
+        
+        try {
+            const response = await axios.get(`https://api-web.nhle.com/v1/club-schedule-season/${teamAbbr}/now`);
+            const games = response.data.games;
+            
+            const now = new Date();
+            const upcomingGames = games.filter(game => new Date(game.startTimeUTC) >= now).slice(0, 5);
+            
+            if (upcomingGames.length === 0) {
+                message.reply(`No upcoming games found for the ${teamName}.`);
+                return;
+            }
+            
+            const scheduleLines = upcomingGames.map(game => {
+                const gameDate = new Date(game.startTimeUTC);
+                const dateStr = gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                const timeStr = gameDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                const isHome = game.homeTeam.abbrev === teamAbbr;
+                const opponent = isHome ? game.awayTeam.abbrev : game.homeTeam.abbrev;
+                const location = isHome ? 'vs' : '@';
+                return `${dateStr} ${location} ${opponent} @ ${timeStr}`;
+            });
+            
+            const embed = {
+                color: 0x0099ff,
+                title: `📅 ${teamName} Schedule`,
+                description: `Next ${upcomingGames.length} game${upcomingGames.length > 1 ? 's' : ''}:\n\n` + scheduleLines.join('\n'),
+                timestamp: new Date().toISOString(),
+                footer: {
+                    text: 'NHL Countdown Bot'
+                }
+            };
+            
+            message.reply({ embeds: [embed] });
+            
+        } catch (error) {
+            console.error('Error processing schedule request:', error);
+            message.reply('Sorry, there was an error getting the schedule information. Please try again later.');
+        }
+        return;
+    }
+    
     if (command === 'previousgame') {
         if (!teamInput) {
             message.reply('Please specify a team! Example: `!previousgame pen`');
             return;
         }
         
-        const teamAbbr = teamMappings[teamInput] || teamInput.toUpperCase();
-        const teamName = teamNames[teamAbbr];
+        const teamAbbr = getTeamAbbr(teamInput);
+        const teamName = teamAbbr ? getTeamName(teamAbbr) : null;
         
         if (!teamName) {
             message.reply(`Sorry, I don't recognize the team "${teamInput}". Use \`!commands\` to see supported teams.`);
@@ -1042,8 +894,8 @@ client.on('messageCreate', async (message) => {
             }
             
             const gameDate = new Date(game.startTimeUTC);
-            const homeTeam = teamNames[game.homeTeam.abbrev];
-            const awayTeam = teamNames[game.awayTeam.abbrev];
+            const homeTeam = getTeamName(game.homeTeam.abbrev);
+            const awayTeam = getTeamName(game.awayTeam.abbrev);
             const homeScore = game.homeTeam.score;
             const awayScore = game.awayTeam.score;
             const isHome = game.homeTeam.abbrev === teamAbbr;
@@ -1099,8 +951,8 @@ client.on('messageCreate', async (message) => {
             return;
         }
         
-        const teamAbbr = teamMappings[teamInput] || teamInput.toUpperCase();
-        const teamName = teamNames[teamAbbr];
+        const teamAbbr = getTeamAbbr(teamInput);
+        const teamName = teamAbbr ? getTeamName(teamAbbr) : null;
         
         if (!teamName) {
             message.reply(`Sorry, I don't recognize the team "${teamInput}". Use \`!commands\` to see supported teams.`);
@@ -1117,8 +969,8 @@ client.on('messageCreate', async (message) => {
             
             const { game, gameDetails, recapVideo } = recapData;
             const gameDate = new Date(game.startTimeUTC);
-            const homeTeam = teamNames[game.homeTeam.abbrev];
-            const awayTeam = teamNames[game.awayTeam.abbrev];
+            const homeTeam = getTeamName(game.homeTeam.abbrev);
+            const awayTeam = getTeamName(game.awayTeam.abbrev);
             const isHome = game.homeTeam.abbrev === teamAbbr;
             const opponent = isHome ? awayTeam : homeTeam;
             const homeScore = game.homeTeam.score;
@@ -1252,9 +1104,9 @@ client.on('messageCreate', async (message) => {
                     }
                     
                     const teamAbbrev = star.teamAbbrev || star.team?.abbrev || star.teamAbbreviation || star.player?.team?.abbrev || '';
-                    const teamName = teamNames[teamAbbrev] || teamAbbrev || '';
+                    const starTeamName = getTeamName(teamAbbrev) || teamAbbrev || '';
                     
-                    return `${index + 1}⭐ ${playerName}${teamName ? ` (${teamName})` : ''}`;
+                    return `${index + 1}⭐ ${playerName}${starTeamName ? ` (${starTeamName})` : ''}`;
                 }).join('\n');
                 
                 embed.fields.push({
@@ -1279,8 +1131,8 @@ client.on('messageCreate', async (message) => {
             return;
         }
         
-        const teamAbbr = teamMappings[teamInput] || teamInput.toUpperCase();
-        const teamName = teamNames[teamAbbr];
+        const teamAbbr = getTeamAbbr(teamInput);
+        const teamName = teamAbbr ? getTeamName(teamAbbr) : null;
         
         if (!teamName) {
             message.reply(`Sorry, I don't recognize the team "${teamInput}". Use \`!commands\` to see supported teams.`);
@@ -1371,7 +1223,7 @@ client.on('messageCreate', async (message) => {
                 const embed = {
                     color: 0x0099ff,
                     title: `👤 ${player.name} Stats`,
-                    description: `${player.position} • ${teamNames[player.team] || player.team}`,
+                    description: `${player.position} • ${getTeamName(player.team) || player.team}`,
                     fields: [
                         {
                             name: '🏒 Games Played',
@@ -1456,7 +1308,7 @@ client.on('messageCreate', async (message) => {
                         return {
                             color: 0x00ff88,
                             title: `👤 ${player.name}`,
-                            description: `${player.position} • ${teamNames[player.team] || player.team}`,
+                            description: `${player.position} • ${getTeamName(player.team) || player.team}`,
                             fields: [
                                 {
                                     name: '🏒 GP',
@@ -1479,7 +1331,7 @@ client.on('messageCreate', async (message) => {
                         return {
                             color: 0x0099ff,
                             title: `👤 ${player.name}`,
-                            description: `${player.position} • ${teamNames[player.team] || player.team}`,
+                            description: `${player.position} • ${getTeamName(player.team) || player.team}`,
                             fields: [
                                 {
                                     name: '🏒 GP',
@@ -1554,7 +1406,7 @@ client.on('messageCreate', async (message) => {
                 const embed = {
                     color: 0xff6b35, // Orange color for career stats
                     title: `🏆 ${player.name} Career Stats`,
-                    description: `${player.position} • ${teamNames[player.team] || player.team}${ageString}`,
+                    description: `${player.position} • ${getTeamName(player.team) || player.team}${ageString}`,
                     fields: [
                         {
                             name: '🏒 Games Played',
@@ -1649,7 +1501,7 @@ client.on('messageCreate', async (message) => {
                         return {
                             color: 0xff8c42,
                             title: `🏆 ${player.name}`,
-                            description: `${player.position} • ${teamNames[player.team] || player.team}`,
+                            description: `${player.position} • ${getTeamName(player.team) || player.team}`,
                             fields: [
                                 {
                                     name: '🏒 GP',
@@ -1672,7 +1524,7 @@ client.on('messageCreate', async (message) => {
                         return {
                             color: 0xff6b35,
                             title: `🏆 ${player.name}`,
-                            description: `${player.position} • ${teamNames[player.team] || player.team}`,
+                            description: `${player.position} • ${getTeamName(player.team) || player.team}`,
                             fields: [
                                 {
                                     name: '🏒 GP',
@@ -1726,8 +1578,8 @@ client.on('messageCreate', async (message) => {
                     return;
                 }
                 
-                const teamAbbr = teamMappings[teamInput] || teamInput.toUpperCase();
-                const teamName = teamNames[teamAbbr];
+                const teamAbbr = getTeamAbbr(teamInput);
+                const teamName = teamAbbr ? getTeamName(teamAbbr) : null;
                 
                 if (!teamName) {
                     message.reply(`Sorry, I don't recognize the team "${teamInput}".`);
@@ -1752,7 +1604,7 @@ client.on('messageCreate', async (message) => {
                 }
                 
                 const standingsText = divisionStandings.slice(0, 8).map((team, index) => 
-                    `${index + 1}. ${teamNames[team.teamAbbrev.default] || team.teamName.default} (${team.wins}-${team.losses}-${team.otLosses}) - ${team.points}pts`
+                    `${index + 1}. ${getTeamName(team.teamAbbrev.default) || team.teamName.default} (${team.wins}-${team.losses}-${team.otLosses}) - ${team.points}pts`
                 ).join('\n');
                 
                 const embed = {
@@ -1772,8 +1624,8 @@ client.on('messageCreate', async (message) => {
                     return;
                 }
                 
-                const teamAbbr = teamMappings[teamInput] || teamInput.toUpperCase();
-                const teamName = teamNames[teamAbbr];
+                const teamAbbr = getTeamAbbr(teamInput);
+                const teamName = teamAbbr ? getTeamName(teamAbbr) : null;
                 
                 if (!teamName) {
                     message.reply(`Sorry, I don't recognize the team "${teamInput}".`);
@@ -1802,7 +1654,7 @@ client.on('messageCreate', async (message) => {
                 const secondHalf = conferenceStandings.slice(8, 16);
                 
                 const formatTeamLine = (team, index) => {
-                    const name = teamNames[team.teamAbbrev.default] || team.teamName.default;
+                    const name = getTeamName(team.teamAbbrev.default) || team.teamName.default;
                     if (team.teamAbbrev.default === teamAbbr) {
                         return `➤ ${index + 1}. ${name} (${team.wins}-${team.losses}-${team.otLosses}) - ${team.points}pts`;
                     }
@@ -1831,8 +1683,8 @@ client.on('messageCreate', async (message) => {
             }
             
             if (command === 'leaguestandings') {
-                const highlightTeam = teamInput ? (teamMappings[teamInput] || teamInput.toUpperCase()) : null;
-                const isValidTeam = highlightTeam && teamNames[highlightTeam];
+                const highlightTeam = teamInput ? getTeamAbbr(teamInput) : null;
+                const isValidTeam = highlightTeam && getTeamName(highlightTeam);
                 
                 const sortedTeams = standings.standings.sort((a, b) => b.points - a.points);
                 
@@ -1840,7 +1692,7 @@ client.on('messageCreate', async (message) => {
                     // Find the highlighted team's position and info
                     const teamIndex = sortedTeams.findIndex(team => team.teamAbbrev.default === highlightTeam);
                     const highlightedTeam = sortedTeams[teamIndex];
-                    const teamName = teamNames[highlightedTeam.teamAbbrev.default];
+                    const teamName = getTeamName(highlightedTeam.teamAbbrev.default);
                     
                     const highlightEmbed = {
                         color: 0xffd700, // Gold color for highlight
@@ -1870,12 +1722,12 @@ client.on('messageCreate', async (message) => {
                     const secondHalf = sortedTeams.slice(16);
                     
                     const formatTeamLine = (team, index) => {
-                        const teamName = teamNames[team.teamAbbrev.default] || team.teamName.default;
+                        const teamLineName = getTeamName(team.teamAbbrev.default) || team.teamName.default;
                         // Use arrow emoji for highlighted team
                         if (highlightTeam && team.teamAbbrev.default === highlightTeam) {
-                            return `➤ ${index + 1}. ${teamName} (${team.wins}-${team.losses}-${team.otLosses}) - ${team.points}pts`;
+                            return `➤ ${index + 1}. ${teamLineName} (${team.wins}-${team.losses}-${team.otLosses}) - ${team.points}pts`;
                         }
-                        return `  ${index + 1}. ${teamName} (${team.wins}-${team.losses}-${team.otLosses}) - ${team.points}pts`;
+                        return `  ${index + 1}. ${teamLineName} (${team.wins}-${team.losses}-${team.otLosses}) - ${team.points}pts`;
                     };
                     
                     const standingsText1 = firstHalf.map((team, index) => 
@@ -1906,11 +1758,11 @@ client.on('messageCreate', async (message) => {
                     const secondHalf = sortedTeams.slice(16);
                     
                     const standingsText1 = firstHalf.map((team, index) => 
-                        `${index + 1}. ${teamNames[team.teamAbbrev.default] || team.teamName.default} (${team.wins}-${team.losses}-${team.otLosses}) - ${team.points}pts`
+                        `${index + 1}. ${getTeamName(team.teamAbbrev.default) || team.teamName.default} (${team.wins}-${team.losses}-${team.otLosses}) - ${team.points}pts`
                     ).join('\n');
                     
                     const standingsText2 = secondHalf.map((team, index) => 
-                        `${index + 17}. ${teamNames[team.teamAbbrev.default] || team.teamName.default} (${team.wins}-${team.losses}-${team.otLosses}) - ${team.points}pts`
+                        `${index + 17}. ${getTeamName(team.teamAbbrev.default) || team.teamName.default} (${team.wins}-${team.losses}-${team.otLosses}) - ${team.points}pts`
                     ).join('\n');
                     
                     const embed1 = {
@@ -1949,8 +1801,8 @@ client.on('messageCreate', async (message) => {
             return;
         }
         
-        const teamAbbr = teamMappings[teamInput] || teamInput.toUpperCase();
-        const teamName = teamNames[teamAbbr];
+        const teamAbbr = getTeamAbbr(teamInput);
+        const teamName = teamAbbr ? getTeamName(teamAbbr) : null;
         
         if (!teamName) {
             message.reply(`Sorry, I don't recognize the team "${teamInput}". Use \`!commands\` to see supported teams.`);
@@ -2127,8 +1979,8 @@ client.on('messageCreate', async (message) => {
             
             // Check if team-specific news requested
             if (teamInput) {
-                const teamAbbr = teamMappings[teamInput] || teamInput.toUpperCase();
-                const teamName = teamNames[teamAbbr];
+                const teamAbbr = getTeamAbbr(teamInput);
+                const teamName = teamAbbr ? getTeamName(teamAbbr) : null;
                 
                 if (!teamName) {
                     message.reply(`Sorry, I don't recognize the team "${teamInput}". Use \`!commands\` to see supported teams.`);
