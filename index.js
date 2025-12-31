@@ -1987,15 +1987,12 @@ client.on('messageCreate', async (message) => {
                     return;
                 }
                 
-                // First try to find team news in the main feed
-                let teamNews = filterNewsForTeam(newsItems, teamAbbr);
+                // Fetch team-specific RSS feed directly for better results
+                let teamNews = await getTeamNewsRSS(teamAbbr);
                 
-                // If no news in main feed, fetch team-specific RSS feed
-                if (teamNews.length === 0) {
-                    const teamSpecificNews = await getTeamNewsRSS(teamAbbr);
-                    if (teamSpecificNews && teamSpecificNews.length > 0) {
-                        teamNews = teamSpecificNews;
-                    }
+                // Fallback to filtering main feed if team feed fails
+                if (!teamNews || teamNews.length === 0) {
+                    teamNews = filterNewsForTeam(newsItems, teamAbbr);
                 }
                 
                 if (teamNews.length === 0) {
