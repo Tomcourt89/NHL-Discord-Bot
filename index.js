@@ -299,6 +299,147 @@ function getCurrentNHLSeason() {
     return parseInt(`${seasonStartYear}${seasonEndYear}`);
 }
 
+// Helper function to get previous season from a season number
+function getPreviousSeason(season) {
+    const startYear = Math.floor(season / 10000);
+    const prevStartYear = startYear - 1;
+    return parseInt(`${prevStartYear}${prevStartYear + 1}`);
+}
+
+// Helper function to format season for display (e.g., 20252026 -> "2025-26")
+function formatSeasonDisplay(season) {
+    const startYear = Math.floor(season / 10000);
+    const endYear = season % 10000;
+    return `${startYear}-${String(endYear).slice(-2)}`;
+}
+
+// Fetch team's past games across multiple seasons
+async function getTeamPastGames(teamAbbr, numGames, isPlayoffs = false) {
+    const games = [];
+    let currentSeason = getCurrentNHLSeason();
+    const gameType = isPlayoffs ? 3 : 2; // 2 = regular season, 3 = playoffs
+    
+    // If looking for playoffs during regular season, start from previous season
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    if (isPlayoffs && month >= 9 && month <= 12) {
+        // We're in October-December, playoffs haven't started yet
+        currentSeason = getPreviousSeason(currentSeason);
+    } else if (isPlayoffs && month >= 1 && month <= 4) {
+        // We're in Jan-April, current season playoffs likely haven't started
+        currentSeason = getPreviousSeason(currentSeason);
+    }
+    
+    // Fetch games going back through seasons until we have enough
+    let attempts = 0;
+    const maxAttempts = 10; // Prevent infinite loops
+    
+    while (games.length < numGames && attempts < maxAttempts) {
+        try {
+            const response = await axios.get(`https://api-web.nhle.com/v1/club-schedule-season/${teamAbbr}/${currentSeason}`);
+            
+            if (response.data && response.data.games) {
+                // Filter for completed games of the correct type
+                const seasonGames = response.data.games.filter(game => {
+                    const isCorrectType = game.gameType === gameType;
+                    const isCompleted = game.gameState === 'OFF' || game.gameState === 'FINAL';
+                    return isCorrectType && isCompleted;
+                });
+                
+                // Sort by date descending (most recent first) and add season info
+                seasonGames.sort((a, b) => new Date(b.startTimeUTC) - new Date(a.startTimeUTC));
+                seasonGames.forEach(game => {
+                    game.seasonDisplay = formatSeasonDisplay(currentSeason);
+                    game.season = currentSeason;
+                });
+                
+                games.push(...seasonGames);
+            }
+        } catch (error) {
+            // Season data might not exist, continue to previous season
+            console.log(`No data for ${teamAbbr} season ${currentSeason}`);
+        }
+        
+        currentSeason = getPreviousSeason(currentSeason);
+        attempts++;
+    }
+    
+    // Return only the requested number of games
+    return games.slice(0, numGames);
+}
+
+// Fetch player's past games across multiple seasons
+async function getPlayerPastGames(playerId, numGames, isPlayoffs = false) {
+    const games = [];
+    let currentSeason = getCurrentNHLSeason();
+    const gameType = isPlayoffs ? 3 : 2; // 2 = regular season, 3 = playoffs
+    
+    // If looking for playoffs during regular season, start from previous season
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    if (isPlayoffs && month >= 9 && month <= 12) {
+        currentSeason = getPreviousSeason(currentSeason);
+    } else if (isPlayoffs && month >= 1 && month <= 4) {
+        currentSeason = getPreviousSeason(currentSeason);
+    }
+    
+    // Fetch games going back through seasons until we have enough
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    while (games.length < numGames && attempts < maxAttempts) {
+        try {
+            const response = await axios.get(`https://api-web.nhle.com/v1/player/${playerId}/game-log/${currentSeason}/${gameType}`);
+            
+            if (response.data && response.data.gameLog && response.data.gameLog.length > 0) {
+                const seasonGames = response.data.gameLog.map(game => ({
+                    ...game,
+                    seasonDisplay: formatSeasonDisplay(currentSeason),
+                    season: currentSeason
+                }));
+                
+                games.push(...seasonGames);
+            }
+        } catch (error) {
+            console.log(`No game log for player ${playerId} season ${currentSeason} gameType ${gameType}`);
+        }
+        
+        currentSeason = getPreviousSeason(currentSeason);
+        attempts++;
+    }
+    
+    return games.slice(0, numGames);
+}
+
+// Search for a player and return their info including position
+async function searchPlayer(playerQuery) {
+    try {
+        const searchResponse = await axios.get(`https://search.d3.nhle.com/api/v1/search/player?culture=en-us&limit=5&q=${encodeURIComponent(playerQuery)}`);
+        
+        if (!searchResponse.data || searchResponse.data.length === 0) {
+            return null;
+        }
+        
+        // Get the first match
+        const player = searchResponse.data[0];
+        
+        // Fetch player landing page for position info
+        const landingResponse = await axios.get(`https://api-web.nhle.com/v1/player/${player.playerId}/landing`);
+        
+        return {
+            playerId: player.playerId,
+            name: player.name,
+            position: landingResponse.data?.position || 'N/A',
+            positionCode: landingResponse.data?.position || 'N/A',
+            team: landingResponse.data?.currentTeamAbbrev || 'N/A',
+            teamName: landingResponse.data?.currentTeamAbbrev ? getTeamName(landingResponse.data.currentTeamAbbrev) : 'N/A'
+        };
+    } catch (error) {
+        console.error('Error searching for player:', error);
+        return null;
+    }
+}
+
 async function getPlayerStats(playerQuery) {
     try {
         // Search for players matching the query
@@ -684,6 +825,16 @@ client.on('messageCreate', async (message) => {
                 {
                     name: '📊 Career Stats',
                     value: '`!careerstats [name]` - Shows player career totals\nExample: `!careerstats crosby`, `!careerstats ovechkin`',
+                    inline: false
+                },
+                {
+                    name: '📈 Team Recent Games',
+                    value: '`!teampast5 [team]` - Last 5 games stats\n`!teampast10 [team]` - Last 10 games stats\n`!teampast20 [team]` - Last 20 games stats\nAdd `playoffs` for playoff stats\nExample: `!teampast5 pen`, `!teampast10 seattle playoffs`',
+                    inline: false
+                },
+                {
+                    name: '👤 Player Recent Games',
+                    value: '`!playerpast5 [name]` - Last 5 games stats\n`!playerpast10 [name]` - Last 10 games stats\n`!playerpast20 [name]` - Last 20 games stats\nAdd `playoffs` for playoff stats\nExample: `!playerpast5 crosby`, `!playerpast10 ovechkin playoffs`',
                     inline: false
                 },
                 {
@@ -2085,6 +2236,424 @@ client.on('messageCreate', async (message) => {
         } catch (error) {
             console.error('Error processing news command:', error);
             message.reply('Sorry, there was an error getting news information.');
+        }
+        return;
+    }
+    
+    // Team Past Games Commands (!teampast5, !teampast10, !teampast20)
+    if (command === 'teampast5' || command === 'teampast10' || command === 'teampast20') {
+        const numGames = parseInt(command.replace('teampast', ''));
+        
+        if (!teamInput) {
+            message.reply(`Please specify a team! Example: \`!${command} pen\` or \`!${command} pen playoffs\``);
+            return;
+        }
+        
+        // Check for playoffs flag
+        const allArgs = args.slice(1);
+        const isPlayoffs = allArgs[allArgs.length - 1]?.toLowerCase() === 'playoffs';
+        const teamArg = isPlayoffs ? allArgs.slice(0, -1).join(' ') : allArgs.join(' ');
+        
+        const teamAbbr = getTeamAbbr(teamArg || teamInput);
+        const teamName = teamAbbr ? getTeamName(teamAbbr) : null;
+        
+        if (!teamName) {
+            message.reply(`Sorry, I don't recognize the team "${teamArg || teamInput}". Use \`!commands\` to see supported teams.`);
+            return;
+        }
+        
+        try {
+            const games = await getTeamPastGames(teamAbbr, numGames, isPlayoffs);
+            
+            if (!games || games.length === 0) {
+                const gameTypeText = isPlayoffs ? 'playoff' : 'regular season';
+                message.reply(`No recent ${gameTypeText} games found for the ${teamName}.`);
+                return;
+            }
+            
+            // Calculate aggregate stats
+            let wins = 0, losses = 0, otLosses = 0, goalsFor = 0, goalsAgainst = 0;
+            
+            games.forEach(game => {
+                const isHome = game.homeTeam.abbrev === teamAbbr;
+                const teamScore = isHome ? game.homeTeam.score : game.awayTeam.score;
+                const oppScore = isHome ? game.awayTeam.score : game.homeTeam.score;
+                
+                goalsFor += teamScore;
+                goalsAgainst += oppScore;
+                
+                if (teamScore > oppScore) {
+                    wins++;
+                } else if (game.gameOutcome?.lastPeriodType === 'OT' || game.gameOutcome?.lastPeriodType === 'SO') {
+                    otLosses++;
+                } else {
+                    losses++;
+                }
+            });
+            
+            const goalDiff = goalsFor - goalsAgainst;
+            
+            // Group games by season for display with dividers
+            const gamesBySeason = {};
+            games.forEach(game => {
+                const season = game.seasonDisplay;
+                if (!gamesBySeason[season]) {
+                    gamesBySeason[season] = [];
+                }
+                gamesBySeason[season].push(game);
+            });
+            
+            // Build game lines with season dividers
+            const gameLines = [];
+            const seasons = Object.keys(gamesBySeason);
+            
+            seasons.forEach((season, seasonIndex) => {
+                // Add season divider if multiple seasons
+                if (seasons.length > 1) {
+                    const dividerText = isPlayoffs ? `${season} Playoffs` : `${season} Regular Season`;
+                    gameLines.push(`── ${dividerText} ──`);
+                }
+                
+                gamesBySeason[season].forEach(game => {
+                    const gameDate = new Date(game.startTimeUTC);
+                    const dateStr = gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    const isHome = game.homeTeam.abbrev === teamAbbr;
+                    const opponent = isHome ? game.awayTeam.abbrev : game.homeTeam.abbrev;
+                    const teamScore = isHome ? game.homeTeam.score : game.awayTeam.score;
+                    const oppScore = isHome ? game.awayTeam.score : game.homeTeam.score;
+                    const location = isHome ? 'vs' : '@';
+                    
+                    let result = teamScore > oppScore ? 'W' : 'L';
+                    if (teamScore < oppScore && (game.gameOutcome?.lastPeriodType === 'OT' || game.gameOutcome?.lastPeriodType === 'SO')) {
+                        result = 'OTL';
+                    }
+                    
+                    const otIndicator = (game.gameOutcome?.lastPeriodType === 'OT' || game.gameOutcome?.lastPeriodType === 'SO') ? ` (${game.gameOutcome.lastPeriodType})` : '';
+                    
+                    gameLines.push(`${dateStr} ${location} ${opponent}: ${result} ${teamScore}-${oppScore}${otIndicator}`);
+                });
+            });
+            
+            const gameTypeTitle = isPlayoffs ? 'Playoff' : 'Regular Season';
+            const actualGames = games.length;
+            const insufficientNote = actualGames < numGames ? `\n*(Only ${actualGames} ${isPlayoffs ? 'playoff' : ''} games found)*` : '';
+            
+            // Build description with character limit safety (Discord max 4096)
+            let gameListText = gameLines.join('\n');
+            let descriptionText = '```\n' + gameListText + '\n```' + insufficientNote;
+            
+            // Truncate if too long
+            if (descriptionText.length > 4000) {
+                const maxGameLines = Math.floor(3900 / 45);
+                gameListText = gameLines.slice(0, maxGameLines).join('\n') + '\n... (truncated)';
+                descriptionText = '```\n' + gameListText + '\n```' + insufficientNote;
+            }
+            
+            const embed = {
+                color: isPlayoffs ? 0xffd700 : 0x0099ff,
+                title: `📊 ${teamName} - Last ${actualGames} ${gameTypeTitle} Games`,
+                description: descriptionText,
+                fields: [
+                    {
+                        name: '🏒 Record',
+                        value: `${wins}-${losses}-${otLosses}`,
+                        inline: true
+                    },
+                    {
+                        name: '⚽ Goals For',
+                        value: `${goalsFor}`,
+                        inline: true
+                    },
+                    {
+                        name: '🥅 Goals Against',
+                        value: `${goalsAgainst}`,
+                        inline: true
+                    },
+                    {
+                        name: '📊 Goal Diff',
+                        value: `${goalDiff > 0 ? '+' : ''}${goalDiff}`,
+                        inline: true
+                    },
+                    {
+                        name: '📈 GF/Game',
+                        value: `${(goalsFor / actualGames).toFixed(2)}`,
+                        inline: true
+                    },
+                    {
+                        name: '📉 GA/Game',
+                        value: `${(goalsAgainst / actualGames).toFixed(2)}`,
+                        inline: true
+                    }
+                ],
+                timestamp: new Date().toISOString(),
+                footer: {
+                    text: `NHL Bot - ${gameTypeTitle} Stats • Add "playoffs" for playoff stats`
+                }
+            };
+            
+            message.reply({ embeds: [embed] });
+            
+        } catch (error) {
+            console.error('Error processing team past games request:', error);
+            message.reply('Sorry, there was an error getting the team game history. Please try again later.');
+        }
+        return;
+    }
+    
+    // Player Past Games Commands (!playerpast5, !playerpast10, !playerpast20)
+    if (command === 'playerpast5' || command === 'playerpast10' || command === 'playerpast20') {
+        const numGames = parseInt(command.replace('playerpast', ''));
+        
+        if (!teamInput) { // teamInput is actually player name here
+            message.reply(`Please specify a player name! Example: \`!${command} crosby\` or \`!${command} crosby playoffs\``);
+            return;
+        }
+        
+        // Check for playoffs flag and build player query
+        const allArgs = args.slice(1);
+        const isPlayoffs = allArgs[allArgs.length - 1]?.toLowerCase() === 'playoffs';
+        const playerQuery = isPlayoffs ? allArgs.slice(0, -1).join(' ') : allArgs.join(' ');
+        
+        if (!playerQuery) {
+            message.reply(`Please specify a player name! Example: \`!${command} crosby\``);
+            return;
+        }
+        
+        try {
+            // Search for the player
+            const player = await searchPlayer(playerQuery);
+            
+            if (!player) {
+                message.reply(`No player found matching "${playerQuery}".`);
+                return;
+            }
+            
+            const games = await getPlayerPastGames(player.playerId, numGames, isPlayoffs);
+            
+            if (!games || games.length === 0) {
+                const gameTypeText = isPlayoffs ? 'playoff' : 'regular season';
+                message.reply(`No recent ${gameTypeText} games found for ${player.name}.`);
+                return;
+            }
+            
+            const isGoalie = player.position === 'G';
+            const actualGames = games.length;
+            
+            // Calculate aggregate stats based on position
+            let totals = {};
+            
+            if (isGoalie) {
+                totals = { 
+                    gamesStarted: 0, 
+                    wins: 0, 
+                    losses: 0, 
+                    otLosses: 0,
+                    shotsAgainst: 0, 
+                    goalsAgainst: 0, 
+                    saves: 0,
+                    shutouts: 0,
+                    toi: 0
+                };
+                
+                games.forEach(game => {
+                    totals.gamesStarted += game.gamesStarted || 0;
+                    totals.wins += game.wins || 0;
+                    totals.losses += game.losses || 0;
+                    totals.otLosses += game.otLosses || 0;
+                    totals.shotsAgainst += game.shotsAgainst || 0;
+                    totals.goalsAgainst += game.goalsAgainst || 0;
+                    totals.saves += game.savePctg ? Math.round((game.shotsAgainst || 0) * game.savePctg) : (game.shotsAgainst || 0) - (game.goalsAgainst || 0);
+                    totals.shutouts += game.shutouts || 0;
+                    // Parse TOI if available (format: "MM:SS")
+                    if (game.toi) {
+                        const [mins, secs] = game.toi.split(':').map(Number);
+                        totals.toi += mins * 60 + secs;
+                    }
+                });
+                
+                totals.savePct = totals.shotsAgainst > 0 ? (totals.saves / totals.shotsAgainst * 100).toFixed(1) : '0.0';
+                totals.gaa = totals.toi > 0 ? (totals.goalsAgainst / (totals.toi / 3600) ).toFixed(2) : '0.00';
+            } else {
+                totals = { 
+                    goals: 0, 
+                    assists: 0, 
+                    points: 0, 
+                    plusMinus: 0, 
+                    pim: 0, 
+                    shots: 0,
+                    toi: 0
+                };
+                
+                games.forEach(game => {
+                    totals.goals += game.goals || 0;
+                    totals.assists += game.assists || 0;
+                    totals.points += game.points || 0;
+                    totals.plusMinus += game.plusMinus || 0;
+                    totals.pim += game.pim || 0;
+                    totals.shots += game.shots || 0;
+                    if (game.toi) {
+                        const [mins, secs] = game.toi.split(':').map(Number);
+                        totals.toi += mins * 60 + secs;
+                    }
+                });
+            }
+            
+            // Group games by season for display with dividers
+            const gamesBySeason = {};
+            games.forEach(game => {
+                const season = game.seasonDisplay;
+                if (!gamesBySeason[season]) {
+                    gamesBySeason[season] = [];
+                }
+                gamesBySeason[season].push(game);
+            });
+            
+            // Build game lines with season dividers
+            const gameLines = [];
+            const seasons = Object.keys(gamesBySeason);
+            
+            seasons.forEach((season, seasonIndex) => {
+                if (seasons.length > 1) {
+                    const dividerText = isPlayoffs ? `${season} Playoffs` : `${season} Regular Season`;
+                    gameLines.push(`── ${dividerText} ──`);
+                }
+                
+                gamesBySeason[season].forEach(game => {
+                    const gameDate = new Date(game.gameDate + 'T00:00:00'); // Ensure proper date parsing
+                    const dateStr = gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    const opponent = game.opponentAbbrev || 'N/A';
+                    const homeAway = game.homeRoadFlag === 'H' ? 'vs' : '@';
+                    
+                    if (isGoalie) {
+                        // API returns 1/0 for wins/losses/otLosses, or decision field
+                        let result = '-';
+                        if (game.decision === 'W' || game.wins === 1 || game.wins === true) {
+                            result = 'W';
+                        } else if (game.decision === 'L' || game.losses === 1 || game.losses === true) {
+                            result = 'L';
+                        } else if (game.decision === 'O' || game.otLosses === 1 || game.otLosses === true) {
+                            result = 'OTL';
+                        }
+                        const svPct = game.savePctg ? (game.savePctg * 100).toFixed(1) : '0.0';
+                        const ga = game.goalsAgainst || 0;
+                        const sa = game.shotsAgainst || 0;
+                        gameLines.push(`${dateStr} ${homeAway} ${opponent}: ${result} | ${sa - ga}/${sa} SV (${svPct}%) | ${ga} GA`);
+                    } else {
+                        const g = game.goals || 0;
+                        const a = game.assists || 0;
+                        const pts = game.points || 0;
+                        const pm = game.plusMinus || 0;
+                        const pmStr = pm >= 0 ? `+${pm}` : `${pm}`;
+                        const pim = game.pim || 0;
+                        gameLines.push(`${dateStr} ${homeAway} ${opponent}: ${g}G ${a}A ${pts}PTS | ${pmStr} | ${pim}PIM`);
+                    }
+                });
+            });
+            
+            const gameTypeTitle = isPlayoffs ? 'Playoff' : 'Regular Season';
+            const insufficientNote = actualGames < numGames ? `\n*(Only ${actualGames} ${isPlayoffs ? 'playoff' : ''} games found)*` : '';
+            
+            // Build embed fields based on position
+            let fields;
+            
+            if (isGoalie) {
+                fields = [
+                    {
+                        name: '🏒 Record',
+                        value: `${totals.wins}-${totals.losses}-${totals.otLosses}`,
+                        inline: true
+                    },
+                    {
+                        name: '🥅 Save %',
+                        value: `${totals.savePct}%`,
+                        inline: true
+                    },
+                    {
+                        name: '🎯 GAA',
+                        value: `${totals.gaa}`,
+                        inline: true
+                    },
+                    {
+                        name: '🛡️ Saves',
+                        value: `${totals.saves}`,
+                        inline: true
+                    },
+                    {
+                        name: '⚽ GA',
+                        value: `${totals.goalsAgainst}`,
+                        inline: true
+                    },
+                    {
+                        name: '🚫 Shutouts',
+                        value: `${totals.shutouts}`,
+                        inline: true
+                    }
+                ];
+            } else {
+                const avgToi = totals.toi > 0 ? Math.floor(totals.toi / actualGames / 60) + ':' + String(Math.floor((totals.toi / actualGames) % 60)).padStart(2, '0') : 'N/A';
+                const shootPct = totals.shots > 0 ? (totals.goals / totals.shots * 100).toFixed(1) : '0.0';
+                
+                fields = [
+                    {
+                        name: '⚽ Goals',
+                        value: `${totals.goals}`,
+                        inline: true
+                    },
+                    {
+                        name: '🎯 Assists',
+                        value: `${totals.assists}`,
+                        inline: true
+                    },
+                    {
+                        name: '📊 Points',
+                        value: `${totals.points}`,
+                        inline: true
+                    },
+                    {
+                        name: '+/-',
+                        value: `${totals.plusMinus >= 0 ? '+' : ''}${totals.plusMinus}`,
+                        inline: true
+                    },
+                    {
+                        name: '🏒 PIM',
+                        value: `${totals.pim}`,
+                        inline: true
+                    },
+                    {
+                        name: '🎯 Shots',
+                        value: `${totals.shots} (${shootPct}%)`,
+                        inline: true
+                    }
+                ];
+            }
+            
+            // Build description with character limit safety (Discord max 4096)
+            let gameListText = gameLines.join('\n');
+            let descriptionText = `${player.position} • ${player.teamName || player.team}\n\`\`\`\n${gameListText}\n\`\`\`${insufficientNote}`;
+            
+            // Truncate if too long (leave room for formatting)
+            if (descriptionText.length > 4000) {
+                const maxGameLines = Math.floor((3900 - player.position.length - (player.teamName || player.team).length - insufficientNote.length) / 50);
+                gameListText = gameLines.slice(0, maxGameLines).join('\n') + '\n... (truncated)';
+                descriptionText = `${player.position} • ${player.teamName || player.team}\n\`\`\`\n${gameListText}\n\`\`\`${insufficientNote}`;
+            }
+            
+            const embed = {
+                color: isPlayoffs ? 0xffd700 : 0x0099ff,
+                title: `📊 ${player.name} - Last ${actualGames} ${gameTypeTitle} Games`,
+                description: descriptionText,
+                fields: fields,
+                timestamp: new Date().toISOString(),
+                footer: {
+                    text: `NHL Bot - ${gameTypeTitle} Stats • Add "playoffs" for playoff stats`
+                }
+            };
+            
+            message.reply({ embeds: [embed] });
+            
+        } catch (error) {
+            console.error('Error processing player past games request:', error);
+            message.reply('Sorry, there was an error getting the player game history. Please try again later.');
         }
         return;
     }
