@@ -411,28 +411,107 @@ async function getPlayerPastGames(playerId, numGames, isPlayoffs = false) {
     return games.slice(0, numGames);
 }
 
+// Score how well a player name matches the search query
+function scorePlayerMatch(playerName, queryParts) {
+    const nameLower = playerName.toLowerCase();
+    const nameParts = nameLower.split(' ');
+    const queryLower = queryParts.map(p => p.toLowerCase());
+    
+    // Exact full name match (highest priority)
+    if (nameLower === queryLower.join(' ')) {
+        return 100;
+    }
+    
+    const querySurname = queryLower[queryLower.length - 1];
+    const playerSurname = nameParts[nameParts.length - 1];
+    const surnameMatches = playerSurname === querySurname || 
+                           playerSurname.includes(querySurname) || 
+                           querySurname.includes(playerSurname);
+    
+    // For multi-word queries (full name search), surname MUST match
+    if (queryLower.length > 1) {
+        if (!surnameMatches) {
+            return 0; // No match - surname doesn't match
+        }
+        
+        // Check if all query parts appear in the player name
+        const allPartsMatch = queryLower.every(qPart => 
+            nameParts.some(nPart => nPart.includes(qPart) || qPart.includes(nPart))
+        );
+        
+        if (allPartsMatch) {
+            return 80; // Strong match - all parts including surname
+        }
+        
+        return 40; // Surname matches but not all parts
+    }
+    
+    // Single word query (surname only search)
+    if (surnameMatches) {
+        if (playerSurname === querySurname) {
+            return 70; // Exact surname match
+        }
+        return 50; // Partial surname match
+    }
+    
+    // Check if query matches first name (for single word queries)
+    const firstNameMatches = nameParts.some(nPart => 
+        nPart.includes(querySurname) || querySurname.includes(nPart)
+    );
+    
+    if (firstNameMatches) {
+        return 20; // Weak match - only first name
+    }
+    
+    return 0;
+}
+
+// Check if player is on an active NHL roster
+function isActiveNHLPlayer(landingData) {
+    const teamAbbrev = landingData?.currentTeamAbbrev;
+    return teamAbbrev && teamsData[teamAbbrev] !== undefined;
+}
+
 // Search for a player and return their info including position
 async function searchPlayer(playerQuery) {
     try {
-        const searchResponse = await axios.get(`https://search.d3.nhle.com/api/v1/search/player?culture=en-us&limit=5&q=${encodeURIComponent(playerQuery)}`);
+        const searchResponse = await axios.get(`https://search.d3.nhle.com/api/v1/search/player?culture=en-us&limit=50&q=${encodeURIComponent(playerQuery)}`);
         
         if (!searchResponse.data || searchResponse.data.length === 0) {
             return null;
         }
         
-        // Get the first match
-        const player = searchResponse.data[0];
+        const queryParts = playerQuery.trim().split(/\s+/);
         
-        // Fetch player landing page for position info
-        const landingResponse = await axios.get(`https://api-web.nhle.com/v1/player/${player.playerId}/landing`);
+        // Pre-filter using search API data (active NHL players only) and score
+        const candidates = searchResponse.data
+            .filter(player => player.active === true && player.teamAbbrev && teamsData[player.teamAbbrev])
+            .map(player => ({
+                ...player,
+                score: scorePlayerMatch(player.name, queryParts)
+            }))
+            .filter(player => player.score > 0)
+            .sort((a, b) => b.score - a.score);
+        
+        if (candidates.length === 0) {
+            return null;
+        }
+        
+        // Get the best matching player
+        const bestMatch = candidates[0];
+        
+        // Fetch landing data only for the best match
+        const landingResponse = await axios.get(`https://api-web.nhle.com/v1/player/${bestMatch.playerId}/landing`);
+        const landingData = landingResponse.data;
         
         return {
-            playerId: player.playerId,
-            name: player.name,
-            position: landingResponse.data?.position || 'N/A',
-            positionCode: landingResponse.data?.position || 'N/A',
-            team: landingResponse.data?.currentTeamAbbrev || 'N/A',
-            teamName: landingResponse.data?.currentTeamAbbrev ? getTeamName(landingResponse.data.currentTeamAbbrev) : 'N/A'
+            playerId: bestMatch.playerId,
+            name: bestMatch.name,
+            position: landingData?.position || 'N/A',
+            positionCode: landingData?.position || 'N/A',
+            team: landingData?.currentTeamAbbrev || 'N/A',
+            teamName: landingData?.currentTeamAbbrev ? getTeamName(landingData.currentTeamAbbrev) : 'N/A',
+            score: bestMatch.score
         };
     } catch (error) {
         console.error('Error searching for player:', error);
@@ -443,41 +522,83 @@ async function searchPlayer(playerQuery) {
 async function getPlayerStats(playerQuery) {
     try {
         // Search for players matching the query
-        const searchResponse = await axios.get(`https://search.d3.nhle.com/api/v1/search/player?culture=en-us&limit=20&q=${encodeURIComponent(playerQuery)}`);
+        const searchResponse = await axios.get(`https://search.d3.nhle.com/api/v1/search/player?culture=en-us&limit=50&q=${encodeURIComponent(playerQuery)}`);
         
         if (!searchResponse.data || searchResponse.data.length === 0) {
             return null;
         }
         
-        const players = searchResponse.data;
-        const playerStats = [];
+        const queryParts = playerQuery.trim().split(/\s+/);
+        const isFullNameQuery = queryParts.length > 1;
         const currentSeason = getCurrentNHLSeason();
         
-        for (const player of players.slice(0, 5)) { // Limit to 5 players max
+        // Pre-filter using search API data (active NHL players only) and score
+        const candidates = searchResponse.data
+            .filter(player => player.active === true && player.teamAbbrev && teamsData[player.teamAbbrev])
+            .map(player => ({
+                ...player,
+                score: scorePlayerMatch(player.name, queryParts)
+            }))
+            .filter(player => player.score > 0)
+            .sort((a, b) => b.score - a.score);
+        
+        if (candidates.length === 0) {
+            return null;
+        }
+        
+        // If full name query and top result is exact/strong match, only fetch that one
+        const topCandidate = candidates[0];
+        if (isFullNameQuery && topCandidate.score >= 80) {
             try {
-                const statsResponse = await axios.get(`https://api-web.nhle.com/v1/player/${player.playerId}/landing`);
-                if (statsResponse.data && statsResponse.data.seasonTotals && statsResponse.data.seasonTotals.length > 0) {
-                    // Find current season stats
-                    const currentSeasonStats = statsResponse.data.seasonTotals.find(season => season.season === currentSeason);
-                    
-                    if (currentSeasonStats) {
-                        playerStats.push({
-                            name: `${player.name}`,
-                            team: statsResponse.data.currentTeamAbbrev || 'N/A',
-                            position: statsResponse.data.position || 'N/A',
-                            stats: currentSeasonStats,
-                            playerId: player.playerId,
-                            season: currentSeason
-                        });
-                    }
+                const statsResponse = await axios.get(`https://api-web.nhle.com/v1/player/${topCandidate.playerId}/landing`);
+                const landingData = statsResponse.data;
+                const currentSeasonStats = landingData?.seasonTotals?.find(season => 
+                    season.season === currentSeason && season.leagueAbbrev === 'NHL'
+                );
+                if (currentSeasonStats) {
+                    return [{
+                        name: topCandidate.name,
+                        team: landingData.currentTeamAbbrev || 'N/A',
+                        position: landingData.position || 'N/A',
+                        stats: currentSeasonStats,
+                        playerId: topCandidate.playerId,
+                        season: currentSeason,
+                        score: topCandidate.score
+                    }];
                 }
             } catch (error) {
-                console.error(`Error fetching stats for player ${player.playerId}:`, error);
-                continue;
+                console.error(`Error fetching stats for player ${topCandidate.playerId}:`, error);
             }
         }
         
-        return playerStats;
+        // For surname-only queries, fetch top candidates in parallel
+        const toFetch = candidates.slice(0, 8);
+        const results = await Promise.all(toFetch.map(async (player) => {
+            try {
+                const statsResponse = await axios.get(`https://api-web.nhle.com/v1/player/${player.playerId}/landing`);
+                const landingData = statsResponse.data;
+                const currentSeasonStats = landingData?.seasonTotals?.find(season => 
+                    season.season === currentSeason && season.leagueAbbrev === 'NHL'
+                );
+                if (currentSeasonStats) {
+                    return {
+                        name: player.name,
+                        team: landingData.currentTeamAbbrev || 'N/A',
+                        position: landingData.position || 'N/A',
+                        stats: currentSeasonStats,
+                        playerId: player.playerId,
+                        season: currentSeason,
+                        score: player.score
+                    };
+                }
+            } catch (error) {
+                console.error(`Error fetching stats for player ${player.playerId}:`, error);
+            }
+            return null;
+        }));
+        
+        const playerStats = results.filter(p => p !== null).sort((a, b) => b.score - a.score);
+        return playerStats.slice(0, 5);
     } catch (error) {
         console.error('Error fetching player stats:', error);
         return null;
@@ -487,41 +608,97 @@ async function getPlayerStats(playerQuery) {
 async function getPlayerCareerStats(playerQuery) {
     try {
         // Search for players matching the query
-        const searchResponse = await axios.get(`https://search.d3.nhle.com/api/v1/search/player?culture=en-us&limit=20&q=${encodeURIComponent(playerQuery)}`);
+        const searchResponse = await axios.get(`https://search.d3.nhle.com/api/v1/search/player?culture=en-us&limit=50&q=${encodeURIComponent(playerQuery)}`);
         
         if (!searchResponse.data || searchResponse.data.length === 0) {
             return null;
         }
         
-        const players = searchResponse.data;
-        const playerCareerStats = [];
+        const queryParts = playerQuery.trim().split(/\s+/);
+        const isFullNameQuery = queryParts.length > 1;
         
-        for (const player of players.slice(0, 5)) { // Limit to 5 players max
+        // Pre-filter and score using search API data
+        // For career stats, include inactive players but prioritize active NHL players
+        const candidates = searchResponse.data
+            .map(player => ({
+                ...player,
+                score: scorePlayerMatch(player.name, queryParts),
+                isActiveNHL: player.active === true && player.teamAbbrev && teamsData[player.teamAbbrev]
+            }))
+            .filter(player => player.score > 0)
+            .sort((a, b) => {
+                // Active NHL players first, then by score
+                if (a.isActiveNHL !== b.isActiveNHL) return b.isActiveNHL ? 1 : -1;
+                return b.score - a.score;
+            });
+        
+        if (candidates.length === 0) {
+            return null;
+        }
+        
+        // If full name query and top result is exact/strong match, only fetch that one
+        const topCandidate = candidates[0];
+        if (isFullNameQuery && topCandidate.score >= 80) {
             try {
-                const statsResponse = await axios.get(`https://api-web.nhle.com/v1/player/${player.playerId}/landing`);
-                if (statsResponse.data && statsResponse.data.careerTotals) {
-                    const careerStats = statsResponse.data.careerTotals.regularSeason;
-                    
-                    if (careerStats) {
-                        playerCareerStats.push({
-                            name: `${player.name}`,
-                            team: statsResponse.data.currentTeamAbbrev || 'N/A',
-                            position: statsResponse.data.position || 'N/A',
-                            stats: careerStats,
-                            playerId: player.playerId,
-                            birthDate: statsResponse.data.birthDate,
-                            birthCity: statsResponse.data.birthCity?.default,
-                            birthCountry: statsResponse.data.birthCountry
-                        });
-                    }
+                const statsResponse = await axios.get(`https://api-web.nhle.com/v1/player/${topCandidate.playerId}/landing`);
+                const landingData = statsResponse.data;
+                const hasNHLCareer = landingData?.seasonTotals?.some(season => season.leagueAbbrev === 'NHL');
+                const careerStats = landingData?.careerTotals?.regularSeason;
+                if (hasNHLCareer && careerStats) {
+                    return [{
+                        name: topCandidate.name,
+                        team: landingData.currentTeamAbbrev || 'N/A',
+                        position: landingData.position || 'N/A',
+                        stats: careerStats,
+                        playerId: topCandidate.playerId,
+                        birthDate: landingData.birthDate,
+                        birthCity: landingData.birthCity?.default,
+                        birthCountry: landingData.birthCountry,
+                        score: topCandidate.score,
+                        isActive: topCandidate.isActiveNHL
+                    }];
                 }
             } catch (error) {
-                console.error(`Error fetching career stats for player ${player.playerId}:`, error);
-                continue;
+                console.error(`Error fetching career stats for player ${topCandidate.playerId}:`, error);
             }
         }
         
-        return playerCareerStats;
+        // For surname-only queries, fetch top candidates in parallel
+        const toFetch = candidates.slice(0, 10);
+        const results = await Promise.all(toFetch.map(async (player) => {
+            try {
+                const statsResponse = await axios.get(`https://api-web.nhle.com/v1/player/${player.playerId}/landing`);
+                const landingData = statsResponse.data;
+                const hasNHLCareer = landingData?.seasonTotals?.some(season => season.leagueAbbrev === 'NHL');
+                const careerStats = landingData?.careerTotals?.regularSeason;
+                if (hasNHLCareer && careerStats) {
+                    return {
+                        name: player.name,
+                        team: landingData.currentTeamAbbrev || 'N/A',
+                        position: landingData.position || 'N/A',
+                        stats: careerStats,
+                        playerId: player.playerId,
+                        birthDate: landingData.birthDate,
+                        birthCity: landingData.birthCity?.default,
+                        birthCountry: landingData.birthCountry,
+                        score: player.score,
+                        isActive: player.isActiveNHL
+                    };
+                }
+            } catch (error) {
+                console.error(`Error fetching career stats for player ${player.playerId}:`, error);
+            }
+            return null;
+        }));
+        
+        const playerCareerStats = results
+            .filter(p => p !== null)
+            .sort((a, b) => {
+                if (a.isActive !== b.isActive) return b.isActive ? 1 : -1;
+                return b.score - a.score;
+            });
+        
+        return playerCareerStats.slice(0, 5);
     } catch (error) {
         console.error('Error fetching player career stats:', error);
         return null;
@@ -1354,16 +1531,17 @@ client.on('messageCreate', async (message) => {
     }
     
     if (command === 'playerstats') {
-        if (!teamInput) { // teamInput is actually player name in this case
-            message.reply('Please specify a player name! Example: `!playerstats crosby` or `!playerstats hughes`');
+        const playerQuery = args.slice(1).join(' ');
+        if (!playerQuery) {
+            message.reply('Please specify a player name! Example: `!playerstats crosby` or `!playerstats connor mcdavid`');
             return;
         }
         
         try {
-            const playerStats = await getPlayerStats(teamInput);
+            const playerStats = await getPlayerStats(playerQuery);
             
             if (!playerStats || playerStats.length === 0) {
-                message.reply(`No players found matching "${teamInput}".`);
+                message.reply(`No active NHL players found matching "${playerQuery}".`);
                 return;
             }
             
@@ -1506,7 +1684,7 @@ client.on('messageCreate', async (message) => {
                 
                 const headerEmbed = {
                     color: 0xffd700,
-                    title: `🔍 Found ${playerStats.length} player(s) matching "${teamInput}"`,
+                    title: `🔍 Found ${playerStats.length} player(s) matching "${playerQuery}"`,
                     description: 'Here are their current season stats:',
                     footer: { text: 'Use full name for detailed stats of a specific player' }
                 };
@@ -1522,16 +1700,17 @@ client.on('messageCreate', async (message) => {
     }
     
     if (command === 'careerstats') {
-        if (!teamInput) { // teamInput is actually player name in this case
-            message.reply('Please specify a player name! Example: `!careerstats crosby` or `!careerstats ovechkin`');
+        const playerQuery = args.slice(1).join(' ');
+        if (!playerQuery) {
+            message.reply('Please specify a player name! Example: `!careerstats crosby` or `!careerstats connor mcdavid`');
             return;
         }
         
         try {
-            const playerCareerStats = await getPlayerCareerStats(teamInput);
+            const playerCareerStats = await getPlayerCareerStats(playerQuery);
             
             if (!playerCareerStats || playerCareerStats.length === 0) {
-                message.reply(`No players found matching "${teamInput}".`);
+                message.reply(`No active NHL players found matching "${playerQuery}".`);
                 return;
             }
             
@@ -1699,7 +1878,7 @@ client.on('messageCreate', async (message) => {
                 
                 const headerEmbed = {
                     color: 0xffd700,
-                    title: `🔍 Found ${playerCareerStats.length} player(s) matching "${teamInput}"`,
+                    title: `🔍 Found ${playerCareerStats.length} player(s) matching "${playerQuery}"`,
                     description: 'Here are their career totals:',
                     footer: { text: 'Use full name for detailed career stats of a specific player' }
                 };
@@ -2424,7 +2603,7 @@ client.on('messageCreate', async (message) => {
             const player = await searchPlayer(playerQuery);
             
             if (!player) {
-                message.reply(`No player found matching "${playerQuery}".`);
+                message.reply(`No active NHL player found matching "${playerQuery}".`);
                 return;
             }
             
