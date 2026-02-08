@@ -5,12 +5,15 @@
 
 const { getTeamAbbr, getTeamName } = require('../utils/teamUtils');
 const { getGameRecap } = require('../api/nhlApi');
+const { parseFlags } = require('../utils/formatUtils');
 
 async function recap(message, args) {
-    const teamInput = args[1];
+    const { flags, cleanArgs } = parseFlags(args, ['spoilerfree']);
+    const isSpoilerFree = flags.spoilerfree;
+    const teamInput = cleanArgs.join(' ');
     
     if (!teamInput) {
-        message.reply('Please specify a team! Example: `!recap pen`');
+        message.reply('Please specify a team! Example: `!recap pen` or `!recap pen spoilerfree`');
         return;
     }
     
@@ -38,18 +41,23 @@ async function recap(message, args) {
     const homeScore = game.homeTeam.score;
     const awayScore = game.awayTeam.score;
     
+    // Build description based on spoiler-free mode
+    const scoreText = isSpoilerFree ? '' : ` (${homeScore}-${awayScore})`;
+    
     if (!recapVideo || !recapVideo.url) {
         const gameId = game.id;
         const nhlGameUrl = `https://www.nhl.com/gamecenter/${gameId}`;
         
         const embed = {
-            color: 0x9b4dff,
+            color: isSpoilerFree ? 0x808080 : 0x9b4dff,
             title: `🎬 ${teamName} vs ${opponent} - No Video Available`,
-            description: `Game from ${gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} (${homeScore}-${awayScore})`,
+            description: `Game from ${gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}${scoreText}`,
             fields: [
                 {
                     name: '🌐 Watch on NHL.com',
-                    value: `[View game highlights and recap on NHL.com](${nhlGameUrl})`,
+                    value: isSpoilerFree 
+                        ? `[View game on NHL.com](${nhlGameUrl}) *(may contain spoilers)*`
+                        : `[View game highlights and recap on NHL.com](${nhlGameUrl})`,
                     inline: false
                 },
                 {
@@ -69,13 +77,13 @@ async function recap(message, args) {
     }
     
     const embed = {
-        color: 0x9b4dff,
+        color: isSpoilerFree ? 0x808080 : 0x9b4dff,
         title: `🎬 ${teamName} vs ${opponent} - Video Recap`,
-        description: `Game played on ${gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+        description: `Game played on ${gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}${isSpoilerFree ? ' *(spoiler-free mode)*' : ''}`,
         fields: [],
         timestamp: new Date().toISOString(),
         footer: {
-            text: 'NHL Bot - Video Recap'
+            text: isSpoilerFree ? 'NHL Bot - Spoiler Free (video may contain spoilers)' : 'NHL Bot - Video Recap'
         }
     };
 
@@ -132,48 +140,50 @@ async function recap(message, args) {
         });
     }
     
-    // Add three stars if available
-    let stars = null;
-    if (gameDetails?.summary?.threeStars) {
-        stars = gameDetails.summary.threeStars;
-    } else if (gameDetails?.threeStars) {
-        stars = gameDetails.threeStars;
-    } else if (gameDetails?.boxscore?.threeStars) {
-        stars = gameDetails.boxscore.threeStars;
-    }
-    
-    if (stars && stars.length > 0) {
-        const starsText = stars.map((star, index) => {                    
-            // Handle different possible star object structures
-            let playerName = 'Unknown Player';
-            
-            if (typeof star === 'string') {
-                playerName = star;
-            } else if (star.name?.default) {
-                playerName = star.name.default;
-            } else if (star.name) {
-                playerName = star.name;
-            } else if (star.player?.name?.default) {
-                playerName = star.player.name.default;
-            } else if (star.player?.name) {
-                playerName = star.player.name;
-            } else if (star.firstName && star.lastName) {
-                playerName = `${star.firstName} ${star.lastName}`;
-            } else if (star.player?.firstName && star.player?.lastName) {
-                playerName = `${star.player.firstName} ${star.player.lastName}`;
-            }
-            
-            const teamAbbrev = star.teamAbbrev || star.team?.abbrev || star.teamAbbreviation || star.player?.team?.abbrev || '';
-            const starTeamName = getTeamName(teamAbbrev) || teamAbbrev || '';
-            
-            return `${index + 1}⭐ ${playerName}${starTeamName ? ` (${starTeamName})` : ''}`;
-        }).join('\n');
+    // Add three stars if available (only in non-spoiler mode)
+    if (!isSpoilerFree) {
+        let stars = null;
+        if (gameDetails?.summary?.threeStars) {
+            stars = gameDetails.summary.threeStars;
+        } else if (gameDetails?.threeStars) {
+            stars = gameDetails.threeStars;
+        } else if (gameDetails?.boxscore?.threeStars) {
+            stars = gameDetails.boxscore.threeStars;
+        }
         
-        embed.fields.push({
-            name: '⭐ Three Stars',
-            value: starsText,
-            inline: false
-        });
+        if (stars && stars.length > 0) {
+            const starsText = stars.map((star, index) => {                    
+                // Handle different possible star object structures
+                let playerName = 'Unknown Player';
+                
+                if (typeof star === 'string') {
+                    playerName = star;
+                } else if (star.name?.default) {
+                    playerName = star.name.default;
+                } else if (star.name) {
+                    playerName = star.name;
+                } else if (star.player?.name?.default) {
+                    playerName = star.player.name.default;
+                } else if (star.player?.name) {
+                    playerName = star.player.name;
+                } else if (star.firstName && star.lastName) {
+                    playerName = `${star.firstName} ${star.lastName}`;
+                } else if (star.player?.firstName && star.player?.lastName) {
+                    playerName = `${star.player.firstName} ${star.player.lastName}`;
+                }
+                
+                const teamAbbrev = star.teamAbbrev || star.team?.abbrev || star.teamAbbreviation || star.player?.team?.abbrev || '';
+                const starTeamName = getTeamName(teamAbbrev) || teamAbbrev || '';
+                
+                return `${index + 1}⭐ ${playerName}${starTeamName ? ` (${starTeamName})` : ''}`;
+            }).join('\n');
+            
+            embed.fields.push({
+                name: '⭐ Three Stars',
+                value: starsText,
+                inline: false
+            });
+        }
     }
     
     message.reply({ embeds: [embed] });

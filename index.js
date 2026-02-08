@@ -9,6 +9,7 @@ const { Client, GatewayIntentBits } = require('discord.js');
 require('dotenv').config();
 
 const { executeCommand, hasCommand } = require('./commands');
+const { startGameScheduler } = require('./utils/scheduler');
 
 // Initialize Discord client
 const client = new Client({
@@ -26,6 +27,9 @@ const PREFIX = '!';
 client.once('clientReady', () => {
     console.log(`✅ NHL Bot is online! Logged in as ${client.user.tag}`);
     console.log(`📊 Serving ${client.guilds.cache.size} server(s)`);
+    
+    // Start the game announcement scheduler
+    startGameScheduler(client);
 });
 
 // Message handler

@@ -5,18 +5,18 @@
 
 const { getTeamAbbr, getTeamName } = require('../utils/teamUtils');
 const { getTeamPastGames } = require('../api/nhlApi');
+const { parseFlags } = require('../utils/formatUtils');
 
 async function teamPastGames(message, args, numGames) {
-    const allArgs = args.slice(1);
+    const { flags, cleanArgs } = parseFlags(args, ['spoilerfree', 'playoffs']);
+    const isSpoilerFree = flags.spoilerfree;
+    const isPlayoffs = flags.playoffs;
+    const teamArg = cleanArgs.join(' ');
     
-    if (allArgs.length === 0) {
-        message.reply(`Please specify a team! Example: \`!teampast${numGames} pen\` or \`!teampast${numGames} pen playoffs\``);
+    if (cleanArgs.length === 0) {
+        message.reply(`Please specify a team! Example: \`!teampast${numGames} pen\` or \`!teampast${numGames} pen playoffs\` or \`!teampast${numGames} pen spoilerfree\``);
         return;
     }
-    
-    // Check for playoffs flag
-    const isPlayoffs = allArgs[allArgs.length - 1]?.toLowerCase() === 'playoffs';
-    const teamArg = isPlayoffs ? allArgs.slice(0, -1).join(' ') : allArgs.join(' ');
     
     const teamAbbr = getTeamAbbr(teamArg);
     const teamName = teamAbbr ? getTeamName(teamAbbr) : null;
@@ -82,28 +82,36 @@ async function teamPastGames(message, args, numGames) {
             const dateStr = gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             const isHome = game.homeTeam.abbrev === teamAbbr;
             const opponent = isHome ? game.awayTeam.abbrev : game.homeTeam.abbrev;
-            const teamScore = isHome ? game.homeTeam.score : game.awayTeam.score;
-            const oppScore = isHome ? game.awayTeam.score : game.homeTeam.score;
             const location = isHome ? 'vs' : '@';
             
-            let result = teamScore > oppScore ? 'W' : 'L';
-            if (teamScore < oppScore && (game.gameOutcome?.lastPeriodType === 'OT' || game.gameOutcome?.lastPeriodType === 'SO')) {
-                result = 'OTL';
+            if (isSpoilerFree) {
+                // Spoiler-free: only show date, location, and opponent
+                gameLines.push(`${dateStr} ${location} ${opponent}`);
+            } else {
+                // Normal mode: show full results
+                const teamScore = isHome ? game.homeTeam.score : game.awayTeam.score;
+                const oppScore = isHome ? game.awayTeam.score : game.homeTeam.score;
+                
+                let result = teamScore > oppScore ? 'W' : 'L';
+                if (teamScore < oppScore && (game.gameOutcome?.lastPeriodType === 'OT' || game.gameOutcome?.lastPeriodType === 'SO')) {
+                    result = 'OTL';
+                }
+                
+                const otIndicator = (game.gameOutcome?.lastPeriodType === 'OT' || game.gameOutcome?.lastPeriodType === 'SO') ? ` (${game.gameOutcome.lastPeriodType})` : '';
+                
+                gameLines.push(`${dateStr} ${location} ${opponent}: ${result} ${teamScore}-${oppScore}${otIndicator}`);
             }
-            
-            const otIndicator = (game.gameOutcome?.lastPeriodType === 'OT' || game.gameOutcome?.lastPeriodType === 'SO') ? ` (${game.gameOutcome.lastPeriodType})` : '';
-            
-            gameLines.push(`${dateStr} ${location} ${opponent}: ${result} ${teamScore}-${oppScore}${otIndicator}`);
         });
     });
     
     const gameTypeTitle = isPlayoffs ? 'Playoff' : 'Regular Season';
     const actualGames = games.length;
     const insufficientNote = actualGames < numGames ? `\n*(Only ${actualGames} ${isPlayoffs ? 'playoff' : ''} games found)*` : '';
+    const spoilerNote = isSpoilerFree ? '\n*(Spoiler-free mode - scores hidden)*' : '';
     
     // Build description with character limit safety (Discord max 4096)
     let gameListText = gameLines.join('\n');
-    let descriptionText = '```\n' + gameListText + '\n```' + insufficientNote;
+    let descriptionText = '```\n' + gameListText + '\n```' + insufficientNote + spoilerNote;
     
     // Truncate if too long
     if (descriptionText.length > 4000) {
@@ -112,45 +120,50 @@ async function teamPastGames(message, args, numGames) {
         descriptionText = '```\n' + gameListText + '\n```' + insufficientNote;
     }
     
+    // Build embed - hide stats fields in spoiler-free mode
+    const embedFields = isSpoilerFree ? [] : [
+        {
+            name: '🏒 Record',
+            value: `${wins}-${losses}-${otLosses}`,
+            inline: true
+        },
+        {
+            name: '⚽ Goals For',
+            value: `${goalsFor}`,
+            inline: true
+        },
+        {
+            name: '🥅 Goals Against',
+            value: `${goalsAgainst}`,
+            inline: true
+        },
+        {
+            name: '📊 Goal Diff',
+            value: `${goalDiff > 0 ? '+' : ''}${goalDiff}`,
+            inline: true
+        },
+        {
+            name: '📈 GF/Game',
+            value: `${(goalsFor / actualGames).toFixed(2)}`,
+            inline: true
+        },
+        {
+            name: '📉 GA/Game',
+            value: `${(goalsAgainst / actualGames).toFixed(2)}`,
+            inline: true
+        }
+    ];
+    
     const embed = {
-        color: isPlayoffs ? 0xffd700 : 0x0099ff,
+        color: isSpoilerFree ? 0x808080 : (isPlayoffs ? 0xffd700 : 0x0099ff),
         title: `📊 ${teamName} - Last ${actualGames} ${gameTypeTitle} Games`,
         description: descriptionText,
-        fields: [
-            {
-                name: '🏒 Record',
-                value: `${wins}-${losses}-${otLosses}`,
-                inline: true
-            },
-            {
-                name: '⚽ Goals For',
-                value: `${goalsFor}`,
-                inline: true
-            },
-            {
-                name: '🥅 Goals Against',
-                value: `${goalsAgainst}`,
-                inline: true
-            },
-            {
-                name: '📊 Goal Diff',
-                value: `${goalDiff > 0 ? '+' : ''}${goalDiff}`,
-                inline: true
-            },
-            {
-                name: '📈 GF/Game',
-                value: `${(goalsFor / actualGames).toFixed(2)}`,
-                inline: true
-            },
-            {
-                name: '📉 GA/Game',
-                value: `${(goalsAgainst / actualGames).toFixed(2)}`,
-                inline: true
-            }
-        ],
+        fields: embedFields,
         timestamp: new Date().toISOString(),
         footer: {
-            text: `NHL Bot - ${gameTypeTitle} Stats • Add "playoffs" for playoff stats`
+            text: isSpoilerFree 
+                ? `NHL Bot - Spoiler Free • Add "playoffs" for playoff games`
+                : `NHL Bot - ${gameTypeTitle} Stats • Add "playoffs" for playoff stats`
         }
     };
     

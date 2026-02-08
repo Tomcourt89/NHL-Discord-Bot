@@ -15,6 +15,7 @@ const { injuries, injury } = require('./injuries');
 const { news } = require('./news');
 const { teamPast5, teamPast10, teamPast20 } = require('./teamPastGames');
 const { playerPast5, playerPast10, playerPast20 } = require('./playerPastGames');
+const { announce, announceOff, announceList } = require('./announce');
 
 /**
  * Command registry mapping command names to their handlers
@@ -61,7 +62,12 @@ const commandRegistry = {
     // Player Past Games
     'playerpast5': playerPast5,
     'playerpast10': playerPast10,
-    'playerpast20': playerPast20
+    'playerpast20': playerPast20,
+    
+    // Game Announcements
+    'announce': announce,
+    'announceoff': announceOff,
+    'announcelist': announceList
 };
 
 /**

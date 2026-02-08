@@ -72,8 +72,37 @@ function parseRssXml(xmlText) {
     return items;
 }
 
+/**
+ * Parse flags from arguments (spoilerfree, playoffs, etc.)
+ * Flags are always at the end of the arguments array
+ * @param {string[]} args - Full args array including command name at index 0
+ * @param {string[]} flagNames - Array of flag names to look for (e.g., ['spoilerfree', 'playoffs'])
+ * @returns {{ flags: Object, cleanArgs: string[] }} - Object with flag states and cleaned args (excluding command name)
+ */
+function parseFlags(args, flagNames = ['spoilerfree', 'playoffs']) {
+    const flags = {};
+    flagNames.forEach(flag => flags[flag] = false);
+    
+    // Start from args[1] to skip command name
+    let cleanArgs = args.slice(1);
+    
+    // Check for flags from the end
+    while (cleanArgs.length > 0) {
+        const lastArg = cleanArgs[cleanArgs.length - 1]?.toLowerCase();
+        if (flagNames.includes(lastArg)) {
+            flags[lastArg] = true;
+            cleanArgs = cleanArgs.slice(0, -1);
+        } else {
+            break;
+        }
+    }
+    
+    return { flags, cleanArgs };
+}
+
 module.exports = {
     formatCountdown,
     cleanHtmlContent,
-    parseRssXml
+    parseRssXml,
+    parseFlags
 };

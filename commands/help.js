@@ -10,12 +10,12 @@ const commandsEmbed = {
         },
         {
             name: '📊 Previous Game',
-            value: '`!previousgame [team]` - Shows the most recent game result\nExample: `!previousgame pen`, `!previousgame seattle`',
+            value: '`!previousgame [team]` - Shows the most recent game result\n`!previousgame [team] spoilerfree` - Shows last game without scores\nExample: `!previousgame pen`, `!previousgame seattle spoilerfree`',
             inline: false
         },
         {
             name: '🎬 Game Recap',
-            value: '`!recap [team]` - Shows video recap of last game\nExample: `!recap pen`, `!recap seattle`',
+            value: '`!recap [team]` - Shows video recap of last game\n`!recap [team] spoilerfree` - Recap without scores (video may contain spoilers)\nExample: `!recap pen`, `!recap seattle spoilerfree`',
             inline: false
         },
         {
@@ -35,7 +35,7 @@ const commandsEmbed = {
         },
         {
             name: '📈 Team Recent Games',
-            value: '`!teampast5 [team]` - Last 5 games stats\n`!teampast10 [team]` - Last 10 games stats\n`!teampast20 [team]` - Last 20 games stats\nAdd `playoffs` for playoff stats\nExample: `!teampast5 pen`, `!teampast10 seattle playoffs`',
+            value: '`!teampast5 [team]` - Last 5 games stats\n`!teampast10 [team]` - Last 10 games stats\n`!teampast20 [team]` - Last 20 games stats\nAdd `playoffs` for playoff stats, `spoilerfree` to hide scores\nExample: `!teampast5 pen`, `!teampast10 seattle playoffs`, `!teampast5 nyr spoilerfree`',
             inline: false
         },
         {
@@ -56,6 +56,11 @@ const commandsEmbed = {
         {
             name: '📰 News',
             value: '`!news` - Latest NHL news and rumors\n`!news [team]` - Team-specific news\nExample: `!news`, `!news pens`',
+            inline: false
+        },
+        {
+            name: '🔔 Game Announcements',
+            value: '`!announce [team]` - Get notified 6 hours before games\n`!announceoff [team]` - Stop notifications for a team\n`!announcelist` - View active subscriptions\nExample: `!announce devils`, `!announceoff pit`',
             inline: false
         },
         {
