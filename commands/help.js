@@ -64,6 +64,11 @@ const commandsEmbed = {
             inline: false
         },
         {
+            name: '🏅 Olympics',
+            value: '`!olympics` - Upcoming Olympic hockey games (next 7 days)\n`!olympics today` - Today\'s Olympic games only\n`!olympics full` - Full tournament schedule',
+            inline: false
+        },
+        {
             name: '🔤 Supported Teams',
             value: 'Use team names, cities, or abbreviations:\n`pen/pens/penguins/pittsburgh`, `seattle/kraken/sea`, `caps/capitals/washington`, etc.',
             inline: false
