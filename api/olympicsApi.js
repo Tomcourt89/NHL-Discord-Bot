@@ -110,11 +110,19 @@ async function getUpcomingOlympicGames() {
 
 /**
  * Get today's Olympic games
- * @returns {Array} - Array of today's games
+ * @returns {Array} - Array of today's games only
  */
 async function getTodaysOlympicGames() {
-    const data = await getOlympicSchedule();
-    return parseGames(data);
+    // Get today's date string for the API
+    const today = new Date();
+    const todayStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+    
+    const data = await getOlympicSchedule(todayStr);
+    const games = parseGames(data);
+    
+    // Double-check filter to only games actually on today's date
+    const todayDate = today.toDateString();
+    return games.filter(g => g.date.toDateString() === todayDate);
 }
 
 /**
