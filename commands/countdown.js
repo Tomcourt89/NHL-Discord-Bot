@@ -32,33 +32,24 @@ async function executeCountdown(message, args) {
     const isHome = game.homeTeam.abbrev === teamAbbr;
     const hostCity = isHome ? teamName.split(' ').pop() : (getTeamName(opponent.abbrev) || '').split(' ').pop();
     
+    // Discord dynamic timestamps
+    const unixTimestamp = Math.floor(gameDate.getTime() / 1000);
+    const discordTime = `<t:${unixTimestamp}:F>`;       // Full date/time (user's timezone)
+    const discordCountdown = `<t:${unixTimestamp}:R>`;  // Live relative countdown
+    
     const embed = {
         color: 0x0099ff,
         title: `⏰ ${teamName} Countdown`,
         description: `Next game: ${isHome ? 'vs' : '@'} ${getTeamName(opponent.abbrev) || opponent.placeName.default}`,
         fields: [
             {
-                name: '🕐 Time Until Game',
-                value: countdown,
+                name: '🕐 Countdown',
+                value: discordCountdown,
                 inline: true
             },
             {
-                name: '📅 Game Date',
-                value: gameDate.toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                }),
-                inline: true
-            },
-            {
-                name: '🕒 Game Time',
-                value: gameDate.toLocaleTimeString('en-US', {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    timeZoneName: 'short'
-                }),
+                name: '📅 Game Date & Time',
+                value: discordTime,
                 inline: true
             },
             {
@@ -126,12 +117,11 @@ async function executeSchedule(message, args) {
     
     const scheduleLines = upcomingGames.map(game => {
         const gameDate = new Date(game.startTimeUTC);
-        const dateStr = gameDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        const timeStr = gameDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        const unixTs = Math.floor(gameDate.getTime() / 1000);
         const isHome = game.homeTeam.abbrev === teamAbbr;
         const opponent = isHome ? game.awayTeam.abbrev : game.homeTeam.abbrev;
         const location = isHome ? 'vs' : '@';
-        return `${dateStr} ${location} ${opponent} @ ${timeStr}`;
+        return `<t:${unixTs}:D> ${location} ${opponent} • <t:${unixTs}:t> (<t:${unixTs}:R>)`;
     });
     
     const embed = {

@@ -64,10 +64,15 @@ function createAnnouncementEmbed(game, teamAbbr) {
     const opponent = isHome ? awayTeam : homeTeam;
     const location = isHome ? 'vs' : '@';
     
+    // Discord timestamp (auto-adjusts to user's timezone)
+    const unixTimestamp = Math.floor(gameTime.getTime() / 1000);
+    const discordTime = `<t:${unixTimestamp}:F>`;       // Full date/time
+    const discordCountdown = `<t:${unixTimestamp}:R>`;  // Relative countdown
+    
     return {
         color: 0x00ff00,
         title: `🏒 Game Alert: ${subscribedTeam} ${location} ${opponent}`,
-        description: `**${subscribedTeam}** play in approximately **${formatTimeUntil(gameTime)}**!`,
+        description: `**${subscribedTeam}** play ${discordCountdown}!`,
         fields: [
             {
                 name: '🏠 Home',
@@ -81,14 +86,7 @@ function createAnnouncementEmbed(game, teamAbbr) {
             },
             {
                 name: '🕐 Game Time',
-                value: gameTime.toLocaleString('en-US', {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    timeZoneName: 'short'
-                }),
+                value: `${discordTime}\n${discordCountdown}`,
                 inline: false
             },
             {
