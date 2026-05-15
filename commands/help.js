@@ -69,6 +69,11 @@ const commandsEmbed = {
             inline: false
         },
         {
+            name: '🌍 IIHF World Championship',
+            value: '`!iihf` - Upcoming IIHF Worlds games (next 7 days)\n`!iihf today` - Today\'s IIHF games only\n`!iihf full` - Full tournament schedule\n*(alias: `!worlds`)*',
+            inline: false
+        },
+        {
             name: '🔤 Supported Teams',
             value: 'Use team names, cities, or abbreviations:\n`pen/pens/penguins/pittsburgh`, `seattle/kraken/sea`, `caps/capitals/washington`, etc.',
             inline: false
